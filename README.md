@@ -40,3 +40,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - UI에 Gemini 3.1 인라인 오디오 감정 태그 추가 (한국어 라벨 제공)
 - API 프롬프트 지침을 감독 모드(director mode)로 최적화하여 태그 인식률 개선
 - 지시어 입력창을 멀티라인 편집창(textarea)으로 변경
+- package.json에 개발/운영 모드 실행 스크립트 추가 (dev:watch, start:watch)
