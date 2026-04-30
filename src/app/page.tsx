@@ -149,10 +149,9 @@ export default function Home() {
             <label htmlFor="style-prompt" className="font-semibold text-gray-700">
               스타일 및 감정 지시어 (Prompt)
             </label>
-            <input
+            <textarea
               id="style-prompt"
-              type="text"
-              className="w-full p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="예: 차분하고 신뢰감 있는 톤"
               value={stylePrompt}
               onChange={(e) => setStylePrompt(e.target.value)}

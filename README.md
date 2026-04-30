@@ -39,3 +39,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - Gemini 3.1 버전에 맞춰 TTS API 파라미터 구조 업데이트 (pitch, speakingRate 제거)
 - UI에 Gemini 3.1 인라인 오디오 감정 태그 추가 (한국어 라벨 제공)
 - API 프롬프트 지침을 감독 모드(director mode)로 최적화하여 태그 인식률 개선
+- 지시어 입력창을 멀티라인 편집창(textarea)으로 변경
