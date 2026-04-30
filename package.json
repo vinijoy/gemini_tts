@@ -7,7 +7,10 @@
     "dev:watch": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:watch": "npm run build && npm run start",
+    "start:prod": "npm run build && npx pm2 restart gemini-tts",
+    "start:init": "npm run build && npx pm2 start npm --name \"gemini-tts\" -- start",
+    "stop": "npx pm2 stop gemini-tts",
+    "delete": "npx pm2 delete gemini-tts",
     "lint": "eslint"
   },
   "dependencies": {
