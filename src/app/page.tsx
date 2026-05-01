@@ -22,6 +22,7 @@ export default function Home() {
       return;
     }
     setError(null);
+    setAudioUrl(null);
     setIsLoading(true);
 
     try {

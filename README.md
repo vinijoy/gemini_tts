@@ -44,3 +44,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - package.json 스크립트 수정: pm2를 npx로 실행하도록 변경 및 start:init, start:prod, stop, delete 추가
 - 프로젝트의 기획 및 요구사항을 명세한 PRD.md 문서 추가
 - next.config.ts에 outputFileTracingRoot 설정 추가하여 다중 lockfile 경고 해결
+- 음성 새로 생성 시 이전 완료 문구 및 오디오 플레이어가 즉시 사라지도록 UI 상태 초기화 로직 추가
