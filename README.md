@@ -42,3 +42,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - 지시어 입력창을 멀티라인 편집창(textarea)으로 변경
 - package.json에 개발/운영 모드 실행 스크립트 추가 (dev:watch, start:watch)
 - package.json 스크립트 수정: pm2를 npx로 실행하도록 변경 및 start:init, start:prod, stop, delete 추가
+- 프로젝트의 기획 및 요구사항을 명세한 PRD.md 문서 추가

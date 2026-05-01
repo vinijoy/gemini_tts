@@ -1,0 +1,43 @@
+# PRD (Product Requirements Document) - Gemini 3.1 TTS Web Interface
+
+## 1. 개요 (Overview)
+**제품명**: Gemini 3.1 Flash TTS Web UI
+**목적**: 구글의 최신 Gemini 3.1 Flash 모델의 TTS(Text-to-Speech) 기능을 누구나 쉽게 테스트하고 활용할 수 있는 직관적이고 접근성 높은 웹 인터페이스 제공. 특히, 감독 모드(Director Mode) 프롬프트와 감정 태그 기능을 통해 자연스럽고 풍부한 고품질 AI 음성을 생성하는 것을 목표로 한다.
+
+## 2. 대상 사용자 (Target Audience)
+- AI 음성을 콘텐츠에 활용하고자 하는 크리에이터
+- 다양한 감정과 톤의 음성이 필요한 오디오북, 영상 제작자
+- 시각 장애를 포함해 스크린 리더(VoiceOver 등)를 사용하는 접근성 중시 사용자
+
+## 3. 핵심 기능 (Key Features)
+### 3.1 음성 변환 (Text-to-Speech)
+- **멀티라인 텍스트 입력**: 길고 복잡한 대본도 쉽게 입력하고 수정할 수 있는 textarea 제공.
+- **음성 모델 선택**: 5가지 고유 음성(Puck, Aoede, Charon, Kore, Fenrir) 중 원하는 목소리 선택 기능.
+
+### 3.2 감정 및 연출 제어 (Emotion & Directing Control)
+- **인라인 감정 태그**: 텍스트 중간에 클릭 한 번으로 `[laughs]`, `[whispers]`, `[enthusiasm]` 등 감정/효과 태그 삽입. (UI에는 한국어 라벨로 제공)
+- **감독 모드 프롬프트 (Style Prompt)**: 텍스트로 직접 읽히지는 않지만, 생성될 음성의 전반적인 톤, 감정, 상황(예: "차분하고 신뢰감 있는 톤")을 지시할 수 있는 프롬프트 입력창 제공.
+
+### 3.3 오디오 재생 및 다운로드 (Playback & Download)
+- **즉각적인 피드백**: API 응답으로 받은 오디오(WAV) 데이터를 브라우저 내에서 즉시 재생.
+- **파일 다운로드**: 생성된 오디오 파일을 `gemini_tts_음성명_시간.wav` 포맷으로 쉽게 로컬에 다운로드.
+- **WAV 헤더 보정**: API가 순수 PCM 데이터만 반환할 경우를 대비해 24kHz, 16bit, Mono WAV 헤더를 자동 생성하여 재생 오류 방지.
+
+### 3.4 접근성 및 UI/UX (Accessibility & UI/UX)
+- **접근성 (A11y)**: `aria-label`, `aria-live` 속성 및 스크린 리더(VoiceOver) 전용 안내 메시지를 통한 완벽한 접근성 지원.
+- **반응형 디자인**: TailwindCSS를 활용한 현대적이고 부드러운 UI (Glassmorphism, 그라데이션, 애니메이션 효과 적용).
+
+### 3.5 안정적인 운영 관리
+- **PM2 프로세스 관리**: `start:prod`, `start:init`, `stop`, `delete` 스크립트를 통해 무중단 및 안정적인 운영 환경 제공.
+
+## 4. 기술 스택 (Tech Stack)
+- **Frontend**: Next.js 16.2.4 (App Router), React 19.2.4, TailwindCSS 4
+- **Backend**: Next.js API Routes (Node.js)
+- **AI Integration**: `@google/genai` (Gemini 3.1 Flash TTS Preview 모델)
+- **DevOps**: PM2 (프로세스 관리)
+
+## 5. 향후 개선 사항 (Future Roadmap)
+- [ ] 생성된 오디오 히스토리(목록) 저장 기능
+- [ ] 사용자 지정 감정 태그 추가 기능
+- [ ] 배경 음악(BGM) 자동 믹싱 기능
+- [ ] 다국어 번역 및 다국어 TTS 연동
