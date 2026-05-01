@@ -43,3 +43,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - package.json에 개발/운영 모드 실행 스크립트 추가 (dev:watch, start:watch)
 - package.json 스크립트 수정: pm2를 npx로 실행하도록 변경 및 start:init, start:prod, stop, delete 추가
 - 프로젝트의 기획 및 요구사항을 명세한 PRD.md 문서 추가
+- next.config.ts에 outputFileTracingRoot 설정 추가하여 다중 lockfile 경고 해결
