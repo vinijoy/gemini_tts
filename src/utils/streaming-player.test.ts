@@ -76,6 +76,45 @@ function createFakeAudioContext({
 }
 
 describe("StreamingPcmPlayer", () => {
+  it("activate가 청크 없이 suspended AudioContext의 재개를 즉시 시작한다", async () => {
+    const resume = createDeferred();
+    const context = createFakeAudioContext({
+      currentTime: 0,
+      resume: () => resume.promise,
+    });
+    const createContext = vi.fn(
+      () => context as unknown as AudioContext,
+    );
+    const player = new StreamingPcmPlayer(createContext, 24000);
+
+    const activation = player.activate();
+
+    expect(createContext).toHaveBeenCalledOnce();
+    expect(context.resume).toHaveBeenCalledOnce();
+    resume.resolve();
+    await activation;
+  });
+
+  it("AudioContext 재개가 거부되면 activate가 원본 오류를 전달하고 닫을 수 있다", async () => {
+    const activationError = new Error("브라우저가 자동 재생을 차단했습니다.");
+    const context = createFakeAudioContext({
+      currentTime: 0,
+      resume: async () => {
+        throw activationError;
+      },
+    });
+    const player = new StreamingPcmPlayer(
+      () => context as unknown as AudioContext,
+      24000,
+    );
+
+    await expect(player.activate()).rejects.toBe(activationError);
+    await expect(player.close()).resolves.toBeUndefined();
+
+    expect(context.resume).toHaveBeenCalledOnce();
+    expect(context.close).toHaveBeenCalledOnce();
+  });
+
   it("두 PCM 청크를 앞선 청크 종료 시각에 이어 예약한다", async () => {
     const context = createFakeAudioContext({ currentTime: 10 });
     const player = new StreamingPcmPlayer(

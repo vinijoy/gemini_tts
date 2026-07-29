@@ -32,6 +32,12 @@ export class PcmChunkAssembler {
   }
 
   getBytes(): Uint8Array {
+    if (this.pendingByte !== null) {
+      throw new Error(
+        "PCM 오디오 데이터가 16비트 샘플 경계로 끝나지 않았습니다. 음성을 다시 생성해 주세요.",
+      );
+    }
+
     const length = this.completedChunks.reduce(
       (sum, part) => sum + part.length,
       0,

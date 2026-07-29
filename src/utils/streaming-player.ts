@@ -12,10 +12,35 @@ export class StreamingPcmPlayer {
 
   private operation: Promise<void> = Promise.resolve();
 
+  private activation: Promise<void> | null = null;
+
   constructor(
     private readonly createContext: AudioContextFactory = () => new AudioContext(),
     private readonly sampleRate = 24000,
   ) {}
+
+  /** 사용자 동작 중 AudioContext 생성과 재개를 시작해 자동 재생을 허용한다. */
+  activate(): Promise<void> {
+    const context = this.context ?? this.createContext();
+    this.context = context;
+    if (context.state !== "suspended") return Promise.resolve();
+    if (this.activation) return this.activation;
+
+    // resume 호출 자체는 현재 사용자 동작의 호출 스택에서 즉시 시작해야 한다.
+    const startedActivation = context.resume();
+    const activation = this.operation.then(() => startedActivation);
+    this.operation = activation.catch(() => undefined);
+    this.activation = activation;
+    void activation.then(
+      () => {
+        if (this.activation === activation) this.activation = null;
+      },
+      () => {
+        if (this.activation === activation) this.activation = null;
+      },
+    );
+    return activation;
+  }
 
   async enqueue(samples: Int16Array): Promise<void> {
     if (samples.length === 0) return;
@@ -81,6 +106,7 @@ export class StreamingPcmPlayer {
     } finally {
       if (this.context === context) {
         this.context = null;
+        this.activation = null;
         this.nextStartTime = 0;
       }
     }

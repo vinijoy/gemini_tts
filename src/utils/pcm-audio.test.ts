@@ -15,6 +15,18 @@ describe("PcmChunkAssembler", () => {
     ).toEqual([-32768, 32767]);
     expect(Array.from(assembler.getBytes())).toEqual([0x00, 0x80, 0xff, 0x7f]);
   });
+
+  it("유효한 샘플 뒤 홀수 바이트 꼬리가 남으면 종료를 거부한다", () => {
+    const assembler = new PcmChunkAssembler();
+
+    expect(
+      Array.from(assembler.push(Uint8Array.from([0x00, 0x80, 0xff]))),
+    ).toEqual([-32768]);
+
+    expect(() => assembler.getBytes()).toThrow(
+      "PCM 오디오 데이터가 16비트 샘플 경계로 끝나지 않았습니다. 음성을 다시 생성해 주세요.",
+    );
+  });
 });
 
 it("PCM16 최솟값과 최댓값을 Float32 범위로 변환한다", () => {
