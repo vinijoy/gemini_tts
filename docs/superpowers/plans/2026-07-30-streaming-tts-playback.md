@@ -14,6 +14,7 @@
 - 코드 변경 전에 `PRD.md`와 `README.md`에 사용자 동작을 먼저 반영한다.
 - 패키지 버전은 기존 기능과 호환되는 새 기능이므로 `0.2.0`으로 올린다.
 - 스트리밍 형식은 24,000Hz, 16비트 리틀엔디언, 모노 PCM이다.
+- HTTP 계약은 `application/octet-stream`과 `X-Audio-Encoding: PCM_S16LE`을 사용하며, 빅엔디언을 뜻하는 `audio/L16`은 사용하지 않는다.
 - 첫 PCM 청크가 도착하면 사용자 추가 조작 없이 자동 재생한다.
 - 생성 중에는 다시 듣기와 다운로드를 비활성화한다.
 - 전체 스트림이 정상 완료된 뒤에만 완성 WAV를 만들고 다시 듣기와 다운로드를 활성화한다.
@@ -473,7 +474,8 @@ const responses = await ai.models.generateContentStream({
 
 return new Response(createPcmStream(responses), {
   headers: {
-    "Content-Type": "audio/L16; rate=24000; channels=1",
+    "Content-Type": "application/octet-stream",
+    "X-Audio-Encoding": "PCM_S16LE",
     "X-Audio-Sample-Rate": "24000",
     "X-Audio-Channels": "1",
     "X-Content-Type-Options": "nosniff",
@@ -482,7 +484,7 @@ return new Response(createPcmStream(responses), {
 });
 ```
 
-스트림 시작 전 Gemini 연결 실패에는 기존 최대 2회 재시도와 한국어 JSON 오류 응답을 유지한다. `Content-Length`는 설정하지 않는다.
+스트림 시작 전 Gemini 연결 실패뿐 아니라 첫 유효 오디오 청크 수신 전 실패와 빈 응답에도 기존 최대 2회 재시도와 한국어 JSON 오류 응답을 유지한다. Route에서 `AbortController`를 생성해 Gemini 요청에 전달하고, 소비자 취소 시 먼저 abort한 뒤 iterator를 정리한다. Base64 형식·패딩을 엄격히 검사하며 빈 디코딩 결과와 최종 홀수 바이트 PCM은 오류로 처리한다. `Content-Length`는 설정하지 않는다.
 
 - [ ] **Step 6: 서버 테스트와 타입 검사**
 
