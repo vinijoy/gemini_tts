@@ -38,12 +38,33 @@ function extractAudioChunks(response: AudioResponse): Uint8Array[] {
   return chunks;
 }
 
+function getFinishError(response: AudioResponse): Error | null {
+  for (const candidate of response.candidates ?? []) {
+    const finishReason = candidate.finishReason;
+    if (!finishReason || finishReason === "STOP") {
+      continue;
+    }
+    if (finishReason === "MAX_TOKENS") {
+      return new Error(
+        "출력 한도에 도달해 음성이 중간에 잘렸습니다. 원고를 더 작은 단위로 나누어 다시 생성해 주세요.",
+      );
+    }
+    return new Error(
+      `Gemini가 음성 생성을 정상적으로 완료하지 못했습니다. (종료 사유: ${finishReason})`,
+    );
+  }
+
+  return null;
+}
+
 function createPcmStreamFromIterator(
   iterator: AsyncIterator<AudioResponse>,
   initialChunks: Uint8Array[],
   abortController?: AbortController,
+  initialFinishError: Error | null = null,
 ): ReadableStream<Uint8Array> {
   const pendingChunks = [...initialChunks];
+  let finishError = initialFinishError;
   let emittedAudio = false;
   let totalByteLength = pendingChunks.reduce(
     (total, chunk) => total + chunk.byteLength,
@@ -64,6 +85,10 @@ function createPcmStreamFromIterator(
     async pull(controller) {
       try {
         while (pendingChunks.length === 0) {
+          if (finishError) {
+            throw finishError;
+          }
+
           const result = await iterator.next();
 
           if (finished) {
@@ -87,6 +112,7 @@ function createPcmStreamFromIterator(
           }
 
           const chunks = extractAudioChunks(result.value);
+          finishError = getFinishError(result.value);
           for (const chunk of chunks) {
             pendingChunks.push(chunk);
             totalByteLength += chunk.byteLength;
@@ -135,6 +161,43 @@ export function createPcmStream(
   );
 }
 
+export function createSequentialPcmStream(
+  sources: AsyncIterable<AudioResponse>[],
+  abortController?: AbortController,
+): ReadableStream<Uint8Array> {
+  async function* sequentialResponses(): AsyncGenerator<AudioResponse> {
+    for (let index = 0; index < sources.length; index += 1) {
+      let emittedAudio = false;
+      let sourceByteLength = 0;
+
+      for await (const response of sources[index]) {
+        const chunks = extractAudioChunks(response);
+        if (chunks.length > 0) {
+          emittedAudio = true;
+          sourceByteLength += chunks.reduce(
+            (total, chunk) => total + chunk.byteLength,
+            0,
+          );
+        }
+        yield response;
+      }
+
+      if (!emittedAudio) {
+        throw new Error(
+          `${index + 1}번째 원고 조각에서 오디오 데이터가 생성되지 않았습니다.`,
+        );
+      }
+      if (sourceByteLength % 2 !== 0) {
+        throw new Error(
+          `${index + 1}번째 원고 조각의 PCM 데이터가 16비트 샘플 경계로 끝나지 않았습니다.`,
+        );
+      }
+    }
+  }
+
+  return createPcmStream(sequentialResponses(), abortController);
+}
+
 export async function preparePcmStream(
   responses: AsyncIterable<AudioResponse>,
   abortController: AbortController,
@@ -154,7 +217,13 @@ export async function preparePcmStream(
           iterator,
           chunks,
           abortController,
+          getFinishError(result.value),
         );
+      }
+
+      const finishError = getFinishError(result.value);
+      if (finishError) {
+        throw finishError;
       }
     }
   } catch (error) {
