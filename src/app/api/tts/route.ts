@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import { createPcmStream } from "./stream";
+import { preparePcmStream } from "./stream";
 
 // API 키 로드 로직 (기존 유지)
 let apiKey = process.env.GEMINI_API_KEY;
@@ -33,6 +33,9 @@ function getErrorMessage(error: unknown): string {
     : "음성 생성 중 알 수 없는 오류가 발생했습니다.";
 }
 
+const STREAM_START_ERROR =
+  "음성 생성 스트림을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as TtsRequestBody;
@@ -58,16 +61,17 @@ export async function POST(req: NextRequest) {
 
     const prompt = `${instructions}\n\n#### TRANSCRIPT\n${text}`;
 
-    let responses: AsyncGenerator<GenerateContentResponse> | null = null;
-    let attempt = 0;
     const maxRetries = 2;
 
-    while (attempt <= maxRetries) {
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      const abortController = new AbortController();
+
       try {
-        responses = await ai.models.generateContentStream({
+        const responses = await ai.models.generateContentStream({
           model: "gemini-3.1-flash-tts-preview",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
+            abortSignal: abortController.signal,
             responseModalities: ["AUDIO"],
             speechConfig: {
               voiceConfig: {
@@ -78,31 +82,30 @@ export async function POST(req: NextRequest) {
             },
           },
         });
-        break;
+        const stream = await preparePcmStream(responses, abortController);
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Audio-Encoding": "PCM_S16LE",
+            "X-Audio-Sample-Rate": "24000",
+            "X-Audio-Channels": "1",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, no-transform",
+          },
+        });
       } catch (error: unknown) {
-        attempt++;
-        if (attempt > maxRetries) {
-          throw error;
+        abortController.abort();
+        if (attempt >= maxRetries) {
+          throw new Error(STREAM_START_ERROR, { cause: error });
         }
         await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * attempt),
+          setTimeout(resolve, 1000 * (attempt + 1)),
         );
       }
     }
 
-    if (!responses) {
-      throw new Error("Gemini 오디오 스트림을 시작하지 못했습니다.");
-    }
-
-    return new Response(createPcmStream(responses), {
-      headers: {
-        "Content-Type": "audio/L16; rate=24000; channels=1",
-        "X-Audio-Sample-Rate": "24000",
-        "X-Audio-Channels": "1",
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "no-store, no-transform",
-      },
-    });
+    throw new Error(STREAM_START_ERROR);
   } catch (error: unknown) {
     console.error("TTS API Error:", error);
     return NextResponse.json(
