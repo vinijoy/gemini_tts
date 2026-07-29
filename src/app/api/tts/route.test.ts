@@ -82,7 +82,7 @@ it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
 });
 
 it("긴 원고를 문장 경계로 나누어 PCM을 요청 순서대로 결합한다", async () => {
-  const firstTranscript = `${"가".repeat(790)}.`;
+  const firstTranscript = `${"가".repeat(290)}.`;
   const secondTranscript = `${"나".repeat(20)}.`;
   gemini.generateContentStream
     .mockResolvedValueOnce(
@@ -134,7 +134,7 @@ it("긴 원고를 문장 경계로 나누어 PCM을 요청 순서대로 결합�
 });
 
 it("후속 원고 조각이 출력 한도로 종료되면 완성 스트림을 거부한다", async () => {
-  const firstTranscript = `${"가".repeat(790)}.`;
+  const firstTranscript = `${"가".repeat(290)}.`;
   const secondTranscript = `${"나".repeat(20)}.`;
   gemini.generateContentStream
     .mockResolvedValueOnce(
@@ -310,7 +310,7 @@ it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", 
     return streamingResponses();
   });
 
-  const longText = `${"가".repeat(790)}. ${"나".repeat(20)}.`;
+  const longText = `${"가".repeat(290)}. ${"나".repeat(20)}.`;
   const response = await POST(createRequest(undefined, longText));
   const reader = response.body?.getReader();
   if (!reader) throw new Error("응답 스트림 reader가 없습니다.");

@@ -4,14 +4,14 @@
 
 **Goal:** 긴 원고를 문장 단위 Gemini 요청으로 끝까지 생성하고, 생성 중과 완료 후 재생에 동일한 Web Audio 경로를 사용한다.
 
-**Architecture:** 서버는 원고를 최대 800자 조각으로 나눈 뒤 Gemini 스트림을 순차 실행하여 단일 PCM 응답으로 결합한다. 각 조각의 종료 사유를 검증해 불완전한 결과를 오류로 처리하고, 클라이언트는 누적 PCM을 WAV 다운로드와 Web Audio 다시 듣기에 함께 사용한다.
+**Architecture:** 서버는 원고를 최대 300자 조각으로 나눈 뒤 Gemini 스트림을 순차 실행하여 단일 PCM 응답으로 결합한다. 각 조각의 종료 사유를 검증해 불완전한 결과를 오류로 처리하고, 클라이언트는 누적 PCM을 WAV 다운로드와 Web Audio 다시 듣기에 함께 사용한다.
 
 **Tech Stack:** Next.js 16.2.12 App Router, React 19.2.4, TypeScript 5, `@google/genai` 1.50.1, Web Audio API, Vitest 4.1.10
 
 ## Global Constraints
 
 - 모든 구현과 커밋은 `sk_dev` 브랜치에서 수행한다.
-- 원고 조각의 기본 최대 길이는 800자다.
+- 원고 조각의 기본 최대 길이는 300자다.
 - 출력은 24kHz, 16비트, 모노 PCM을 유지하며 필터·압축·리샘플링을 추가하지 않는다.
 - 후보의 종료 사유는 비어 있거나 `STOP`일 때만 정상으로 처리한다.
 - 생성 중 재생과 완료 후 다시 듣기는 모두 `StreamingPcmPlayer`를 사용한다.
@@ -364,4 +364,3 @@ Expected: Next.js production build exit 0
 Run: `git diff --check && git status --short && git log --oneline --decorate -8`
 
 Expected: whitespace errors 없음, 의도한 파일만 변경 또는 커밋됨, 현재 브랜치 `sk_dev`
-

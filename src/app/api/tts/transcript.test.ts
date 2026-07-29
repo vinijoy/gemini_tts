@@ -32,6 +32,13 @@ describe("splitTranscript", () => {
     ]);
   });
 
+  it("기본 조각을 300자 이하로 제한한다", () => {
+    const chunks = splitTranscript(`${"가".repeat(290)}. ${"나".repeat(20)}.`);
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.every((chunk) => chunk.length <= 300)).toBe(true);
+  });
+
   it("유효하지 않은 최대 길이는 거부한다", () => {
     expect(() => splitTranscript("원고", 0)).toThrow(
       "원고 조각의 최대 길이는 1 이상이어야 합니다.",

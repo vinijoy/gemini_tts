@@ -1,4 +1,4 @@
-export const DEFAULT_TRANSCRIPT_CHUNK_CHARS = 800;
+export const DEFAULT_TRANSCRIPT_CHUNK_CHARS = 300;
 
 const SENTENCE_END_PATTERN = /[.!?。！？](?:["'”’)\]}」』】》〉]*)\s+/gu;
 const SOFT_BREAK_PATTERN = /(?:\r?\n|[,，、;；:：])\s*/gu;
