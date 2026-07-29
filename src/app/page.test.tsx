@@ -247,6 +247,10 @@ it("스트림 완료 후 다시 듣기와 WAV 다운로드를 활성화한다", 
       name: "음성 생성이 완료되었습니다.",
     }),
   ).toBeInTheDocument();
+  const wavBlob = createObjectUrl.mock.calls[0]?.[0];
+  expect(wavBlob).toBeInstanceOf(Blob);
+  if (!wavBlob) throw new Error("완성된 WAV Blob이 없습니다.");
+  expect(wavBlob).toMatchObject({ size: 46, type: "audio/wav" });
 });
 
 it("상태 라이브 영역을 유지하며 생성 상태 문구만 갱신한다", async () => {
@@ -280,9 +284,6 @@ it("상태 라이브 영역을 유지하며 생성 상태 문구만 갱신한다
 });
 
 it("예약 재생을 닫은 뒤 완성 음성을 처음부터 다시 재생한다", async () => {
-  const playAudio = vi
-    .spyOn(HTMLMediaElement.prototype, "play")
-    .mockResolvedValue();
   const user = userEvent.setup();
   render(<Home />);
 
@@ -302,10 +303,6 @@ it("예약 재생을 닫은 뒤 완성 음성을 처음부터 다시 재생한�
     name: "다시 듣기",
   });
   await waitFor(() => expect(replayButton).toBeEnabled());
-  const completedAudio = document.querySelector("audio");
-  expect(completedAudio).not.toBeNull();
-  if (!completedAudio) throw new Error("완성된 오디오 요소가 없습니다.");
-  completedAudio.currentTime = 12;
   let finishPlayerClose!: () => void;
   player.close.mockReturnValueOnce(
     new Promise<void>((resolve) => {
@@ -317,29 +314,31 @@ it("예약 재생을 닫은 뒤 완성 음성을 처음부터 다시 재생한�
   await user.click(replayButton);
 
   expect(player.close).toHaveBeenCalledOnce();
-  expect(completedAudio.currentTime).toBe(12);
-  expect(playAudio).not.toHaveBeenCalled();
+  expect(player.create).toHaveBeenCalledTimes(2);
+  expect(player.activate).toHaveBeenCalledTimes(2);
+  expect(player.enqueue).toHaveBeenCalledOnce();
 
   finishPlayerClose();
-  await waitFor(() => expect(playAudio).toHaveBeenCalledOnce());
-
-  expect(completedAudio.currentTime).toBe(0);
+  await waitFor(() => expect(player.enqueue).toHaveBeenCalledTimes(2));
+  expect(player.enqueue).toHaveBeenLastCalledWith(Int16Array.from([0]));
+  expect(document.querySelector("audio")).toBeNull();
 
   await user.click(replayButton);
 
-  expect(player.close).toHaveBeenCalledOnce();
-  expect(playAudio).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(player.enqueue).toHaveBeenCalledTimes(3));
+  expect(player.close).toHaveBeenCalledTimes(2);
+  expect(player.create).toHaveBeenCalledTimes(3);
 });
 
 it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하지 않는다", async () => {
-  let rejectPreviousPlay!: (error: Error) => void;
-  const previousPlay = new Promise<void>((_resolve, reject) => {
-    rejectPreviousPlay = reject;
+  let rejectPreviousReplay!: (error: Error) => void;
+  const previousReplayPlayback = new Promise<void>((_resolve, reject) => {
+    rejectPreviousReplay = reject;
   });
-  const playAudio = vi
-    .spyOn(HTMLMediaElement.prototype, "play")
-    .mockReturnValueOnce(previousPlay)
-    .mockResolvedValueOnce();
+  player.enqueue
+    .mockResolvedValueOnce()
+    .mockReturnValueOnce(previousReplayPlayback)
+    .mockResolvedValue();
   vi.spyOn(console, "error").mockImplementation(() => {});
   createObjectUrl
     .mockReturnValueOnce("blob:previous-audio")
@@ -361,7 +360,7 @@ it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하�
   const previousReplay = screen.getByRole("button", { name: "다시 듣기" });
   await waitFor(() => expect(previousReplay).toBeEnabled());
   await user.click(previousReplay);
-  await waitFor(() => expect(playAudio).toHaveBeenCalledOnce());
+  await waitFor(() => expect(player.enqueue).toHaveBeenCalledTimes(2));
 
   let currentController!: ReadableStreamDefaultController<Uint8Array>;
   const currentStream = new ReadableStream<Uint8Array>({
@@ -381,10 +380,10 @@ it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하�
   await waitFor(() => expect(currentReplay).toBeEnabled());
 
   await user.click(currentReplay);
-  await waitFor(() => expect(playAudio).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(player.enqueue).toHaveBeenCalledTimes(4));
 
   await act(async () => {
-    rejectPreviousPlay(new Error("이전 오디오 디코딩 실패"));
+    rejectPreviousReplay(new Error("이전 Web Audio 재생 실패"));
     await Promise.resolve();
   });
 
@@ -395,7 +394,6 @@ it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하�
 });
 
 it("새 생성을 시작하면 재생 중인 완성 오디오를 중지한다", async () => {
-  const pauseAudio = vi.mocked(HTMLMediaElement.prototype.pause);
   const user = userEvent.setup();
   render(<Home />);
 
@@ -412,10 +410,9 @@ it("새 생성을 시작하면 재생 중인 완성 오디오를 중지한다", 
   });
   const replayButton = screen.getByRole("button", { name: "다시 듣기" });
   await waitFor(() => expect(replayButton).toBeEnabled());
-  const completedAudio = document.querySelector("audio");
-  expect(completedAudio).not.toBeNull();
-  if (!completedAudio) throw new Error("완성된 오디오 요소가 없습니다.");
-  completedAudio.currentTime = 7;
+  await user.click(replayButton);
+  await waitFor(() => expect(player.enqueue).toHaveBeenCalledTimes(2));
+  player.close.mockClear();
 
   let nextController!: ReadableStreamDefaultController<Uint8Array>;
   const nextStream = new ReadableStream<Uint8Array>({
@@ -428,8 +425,8 @@ it("새 생성을 시작하면 재생 중인 완성 오디오를 중지한다", 
     screen.getByRole("button", { name: "음성 생성하기 버튼" }),
   );
 
-  expect(pauseAudio).toHaveBeenCalledOnce();
-  expect(completedAudio.currentTime).toBe(0);
+  await waitFor(() => expect(player.close).toHaveBeenCalledOnce());
+  expect(document.querySelector("audio")).toBeNull();
 
   act(() => {
     nextController.enqueue(Uint8Array.from([0, 0]));
@@ -630,7 +627,6 @@ it("새 생성 전 이전 플레이어 종료가 실패하면 새 요청을 막�
 });
 
 it("언마운트 시 요청과 플레이어 및 Blob URL을 정리한다", async () => {
-  const pauseAudio = vi.mocked(HTMLMediaElement.prototype.pause);
   const user = userEvent.setup();
   const { unmount } = render(
     <StrictMode>
@@ -653,18 +649,13 @@ it("언마운트 시 요청과 플레이어 및 Blob URL을 정리한다", async
   await screen.findByRole("link", {
     name: "생성된 음성 파일 다운로드",
   });
-  const completedAudio = document.querySelector("audio");
-  expect(completedAudio).not.toBeNull();
-  if (!completedAudio) throw new Error("완성된 오디오 요소가 없습니다.");
-  completedAudio.currentTime = 9;
 
   unmount();
 
   expect(requestSignal).toBeInstanceOf(AbortSignal);
   expect(requestSignal?.aborted).toBe(true);
   expect(player.close).toHaveBeenCalledOnce();
-  expect(pauseAudio).toHaveBeenCalledOnce();
-  expect(completedAudio.currentTime).toBe(0);
+  expect(document.querySelector("audio")).toBeNull();
   expect(revokeObjectUrl).toHaveBeenCalledWith("blob:test-audio");
 });
 

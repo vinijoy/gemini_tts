@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PcmChunkAssembler,
   createWavBlob,
+  pcm16BytesToSamples,
   pcm16ToFloat32,
 } from "./pcm-audio";
 
@@ -27,6 +28,22 @@ describe("PcmChunkAssembler", () => {
       "PCM 오디오 데이터가 16비트 샘플 경계로 끝나지 않았습니다. 음성을 다시 생성해 주세요.",
     );
   });
+});
+
+it("PCM16 리틀엔디언 바이트를 원래 정수 샘플로 변환한다", () => {
+  expect(
+    Array.from(
+      pcm16BytesToSamples(
+        Uint8Array.from([0x00, 0x80, 0xff, 0x7f]),
+      ),
+    ),
+  ).toEqual([-32768, 32767]);
+});
+
+it("홀수 길이 PCM 바이트는 거부한다", () => {
+  expect(() => pcm16BytesToSamples(Uint8Array.from([0]))).toThrow(
+    "16비트 샘플 경계",
+  );
 });
 
 it("PCM16 최솟값과 최댓값을 Float32 범위로 변환한다", () => {

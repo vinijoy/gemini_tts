@@ -17,18 +17,7 @@ export class PcmChunkAssembler {
       this.completedChunks.push(complete);
     }
 
-    const samples = new Int16Array(complete.length / 2);
-    const view = new DataView(
-      complete.buffer,
-      complete.byteOffset,
-      complete.length,
-    );
-
-    for (let index = 0; index < samples.length; index += 1) {
-      samples[index] = view.getInt16(index * 2, true);
-    }
-
-    return samples;
+    return pcm16BytesToSamples(complete);
   }
 
   getBytes(): Uint8Array {
@@ -52,6 +41,27 @@ export class PcmChunkAssembler {
 
     return result;
   }
+}
+
+/** PCM16 리틀엔디언 바이트를 부호 있는 16비트 샘플로 변환한다. */
+export function pcm16BytesToSamples(bytes: Uint8Array): Int16Array {
+  if (bytes.length % 2 !== 0) {
+    throw new Error(
+      "PCM 오디오 데이터가 16비트 샘플 경계로 끝나지 않았습니다.",
+    );
+  }
+
+  const samples = new Int16Array(bytes.length / 2);
+  const view = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  );
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = view.getInt16(index * 2, true);
+  }
+
+  return samples;
 }
 
 /** PCM16 정수 샘플을 Web Audio에서 사용할 Float32 범위로 정규화한다. */

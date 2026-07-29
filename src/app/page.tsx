@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PcmChunkAssembler, createWavBlob } from "@/utils/pcm-audio";
+import { useEffect, useRef, useState } from "react";
+import {
+  PcmChunkAssembler,
+  createWavBlob,
+  pcm16BytesToSamples,
+} from "@/utils/pcm-audio";
 import { StreamingPcmPlayer } from "@/utils/streaming-player";
 
 type GenerationStatus = "idle" | "streaming" | "complete";
@@ -64,20 +68,6 @@ function createDownloadFileName(voice: string, generatedAt: Date) {
   return `gemini_tts_${voice}_${date}_${time}.wav`;
 }
 
-function stopCompletedAudio(audio: HTMLAudioElement | null) {
-  if (!audio) return;
-  try {
-    audio.pause();
-  } catch (pauseError) {
-    console.error("완성된 음성 재생을 중지하지 못했습니다.", pauseError);
-  }
-  try {
-    audio.currentTime = 0;
-  } catch (seekError) {
-    console.error("완성된 음성 재생 위치를 초기화하지 못했습니다.", seekError);
-  }
-}
-
 export default function Home() {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("Puck");
@@ -88,9 +78,8 @@ export default function Home() {
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
   const [downloadFileName, setDownloadFileName] = useState("");
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const ownedAudioRef = useRef<HTMLAudioElement | null>(null);
   const playerRef = useRef<StreamingPcmPlayer | null>(null);
+  const completedPcmRef = useRef<Uint8Array | null>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
@@ -107,23 +96,11 @@ export default function Home() {
 
   const voices = ["Puck", "Aoede", "Charon", "Kore", "Fenrir"];
 
-  const setAudioElement = useCallback((audio: HTMLAudioElement | null) => {
-    audioRef.current = audio;
-    if (audio) ownedAudioRef.current = audio;
-  }, []);
-
-  const releaseOwnedAudio = useCallback(() => {
-    const audio = ownedAudioRef.current;
-    ownedAudioRef.current = null;
-    if (audioRef.current === audio) audioRef.current = null;
-    stopCompletedAudio(audio);
-  }, []);
-
   useEffect(
     () => () => {
       requestIdRef.current += 1;
       replayPromiseRef.current = null;
-      releaseOwnedAudio();
+      completedPcmRef.current = null;
       requestControllerRef.current?.abort();
       requestControllerRef.current = null;
 
@@ -141,7 +118,7 @@ export default function Home() {
       audioUrlRef.current = null;
       if (url) URL.revokeObjectURL(url);
     },
-    [releaseOwnedAudio],
+    [],
   );
 
   const handleGenerate = async () => {
@@ -155,7 +132,7 @@ export default function Home() {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     replayPromiseRef.current = null;
-    releaseOwnedAudio();
+    completedPcmRef.current = null;
     setError(null);
     setStatus("streaming");
     setHasStartedPlayback(false);
@@ -278,6 +255,7 @@ export default function Home() {
       }
 
       const url = URL.createObjectURL(createWavBlob(pcmBytes));
+      completedPcmRef.current = pcmBytes;
       audioUrlRef.current = url;
       setAudioUrl(url);
       setStatus("complete");
@@ -299,6 +277,7 @@ export default function Home() {
       if (requestIdRef.current !== requestId) return;
 
       console.error(err);
+      completedPcmRef.current = null;
       setError(createGenerationErrorMessage(err));
       setHasStartedPlayback(false);
       setStatus("idle");
@@ -325,20 +304,40 @@ export default function Home() {
 
     const replayRequestId = requestIdRef.current;
     const replayUrl = audioUrlRef.current;
-    const replayAudio = audioRef.current;
-    if (!replayUrl || !replayAudio) return;
+    const replayPcm = completedPcmRef.current;
+    if (!replayUrl || !replayPcm) return;
     const ownsReplay = () =>
       requestIdRef.current === replayRequestId &&
       audioUrlRef.current === replayUrl &&
-      audioRef.current === replayAudio;
+      completedPcmRef.current === replayPcm;
+    let replayPlayer: StreamingPcmPlayer | null = null;
 
     const replay = (async () => {
-      const player = playerRef.current;
-      if (player) {
+      const previousPlayer = playerRef.current;
+      replayPlayer = new StreamingPcmPlayer();
+      let activation: Promise<
+        | { activated: true }
+        | { activated: false; cause: unknown }
+      >;
+      try {
+        // 사용자 클릭 호출 스택에서 즉시 AudioContext 재개를 시작한다.
+        activation = replayPlayer.activate().then(
+          () => ({ activated: true as const }),
+          (cause: unknown) => ({ activated: false as const, cause }),
+        );
+      } catch (activationError) {
+        activation = Promise.resolve({
+          activated: false,
+          cause: activationError,
+        });
+      }
+
+      if (previousPlayer) {
         try {
-          await player.close();
+          await previousPlayer.close();
         } catch (closeError) {
           console.error("스트리밍 재생을 중지하지 못했습니다.", closeError);
+          await replayPlayer.close().catch(() => undefined);
           if (ownsReplay()) {
             setError(
               "스트리밍 재생을 중지하지 못해 다시 듣기를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.",
@@ -346,13 +345,32 @@ export default function Home() {
           }
           return;
         }
-        if (playerRef.current === player) playerRef.current = null;
+        if (playerRef.current === previousPlayer) playerRef.current = null;
       }
 
-      if (!ownsReplay()) return;
-      replayAudio.currentTime = 0;
-      await replayAudio.play();
-    })().catch((playError: unknown) => {
+      const activationResult = await activation;
+      if (!activationResult.activated) {
+        throw new Error(
+          "완성된 음성 재생을 시작하지 못했습니다. 브라우저의 자동 재생 권한을 확인해 주세요.",
+          { cause: activationResult.cause },
+        );
+      }
+      if (!ownsReplay()) {
+        await replayPlayer.close();
+        return;
+      }
+
+      playerRef.current = replayPlayer;
+      await replayPlayer.enqueue(pcm16BytesToSamples(replayPcm));
+    })().catch(async (playError: unknown) => {
+      if (replayPlayer) {
+        if (playerRef.current === replayPlayer) {
+          playerRef.current = null;
+        }
+        await replayPlayer.close().catch((closeError: unknown) => {
+          console.error("완성 음성 재생기 정리에 실패했습니다.", closeError);
+        });
+      }
       console.error("완성된 음성을 재생하지 못했습니다.", playError);
       if (ownsReplay()) {
         setError(
@@ -508,21 +526,14 @@ export default function Home() {
                 다시 듣기
               </button>
               {status === "complete" && audioUrl ? (
-                <>
-                  <audio
-                    ref={setAudioElement}
-                    src={audioUrl}
-                    preload="metadata"
-                  />
-                  <a
-                    href={audioUrl}
-                    download={downloadFileName}
-                    className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold hover:bg-pink-200 transition-colors"
-                    aria-label="생성된 음성 파일 다운로드"
-                  >
-                    음성 파일 다운로드 💾
-                  </a>
-                </>
+                <a
+                  href={audioUrl}
+                  download={downloadFileName}
+                  className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold hover:bg-pink-200 transition-colors"
+                  aria-label="생성된 음성 파일 다운로드"
+                >
+                  음성 파일 다운로드 💾
+                </a>
               ) : (
                 <span
                   aria-disabled="true"
