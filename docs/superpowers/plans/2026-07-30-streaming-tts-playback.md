@@ -27,7 +27,7 @@
 
 - `PRD.md`: 스트리밍 자동 재생 및 완료 후 다시 듣기 요구사항
 - `README.md`: 사용자 동작, 구조, 검증 명령
-- `package.json`, `package-lock.json`: 버전 `0.2.0`, Vitest와 UI 테스트 도구, 테스트 스크립트
+- `package.json`, `package-lock.json`: 버전 `0.2.0`, 보안 패치가 적용된 Next.js, Vitest와 UI 테스트 도구, 테스트 스크립트
 - `vitest.config.ts`: Node 및 jsdom 테스트 환경 설정
 - `src/utils/pcm-audio.ts`: PCM 청크 정렬, Float32 변환, WAV 생성
 - `src/utils/streaming-player.ts`: Web Audio 청크 예약 재생 및 자원 정리
@@ -38,6 +38,7 @@
 - `src/utils/streaming-player.test.ts`: 예약 시각과 정리 단위 테스트
 - `src/app/api/tts/stream.test.ts`: 서버 스트림 단위 테스트
 - `src/app/page.test.tsx`: 생성 중/완료/오류 UI 동작 테스트
+- `test_err.ts`, `test_tts.ts`: 기존 진단 스크립트의 명시적 오류 타입과 미사용 변수 정리
 
 ### Task 1: 문서, 버전 및 테스트 기반 준비
 
@@ -47,6 +48,8 @@
 - Modify: `package.json`
 - Modify: `package-lock.json`
 - Create: `vitest.config.ts`
+- Modify: `test_err.ts`
+- Modify: `test_tts.ts`
 
 **Interfaces:**
 - Consumes: 없음
@@ -90,7 +93,9 @@ Run:
 
 ```bash
 npm version 0.2.0 --no-git-tag-version
-npm install --save-dev vitest@latest jsdom@latest @testing-library/react@latest @testing-library/jest-dom@latest
+npm install next@16.2.12
+npm install --save-dev vitest@latest jsdom@latest @testing-library/react@latest @testing-library/jest-dom@latest @testing-library/user-event@latest
+npm audit fix
 ```
 
 `package.json` scripts에 다음을 추가한다.
@@ -125,20 +130,23 @@ export default defineConfig({
 
 - [ ] **Step 5: 테스트 러너와 기존 검사 확인**
 
+`test_err.ts`와 `test_tts.ts`에서 사용하지 않는 응답 변수는 호출 결과를 변수에 대입하지 않도록 바꾸고, `catch (error: any)`는 `catch (error: unknown)` 및 `error instanceof Error` 분기로 바꾼다. 이 단계에서 `npm audit`이 보고한 직접·전이 의존성 취약점을 모두 해소하며, 보안 패치 후에도 Next.js는 16.x 호환 범위를 유지한다.
+
 Run:
 
 ```bash
 npm test
-npm run lint
+npm audit
+npx eslint test_err.ts test_tts.ts
 ```
 
-Expected: 테스트 파일이 없어도 Vitest가 정상 종료하고 ESLint 오류가 없어야 한다.
+Expected: 테스트 파일이 없어도 Vitest가 정상 종료하고, `npm audit`은 취약점 0개, 두 진단 스크립트의 ESLint 오류와 경고는 0개여야 한다.
 
 - [ ] **Step 6: 커밋**
 
 ```bash
-git add PRD.md README.md package.json package-lock.json vitest.config.ts
-git commit -m "스트리밍 재생 문서와 테스트 환경 준비"
+git add PRD.md README.md package.json package-lock.json vitest.config.ts test_err.ts test_tts.ts
+git commit -m "스트리밍 재생 문서와 안전한 테스트 환경 준비"
 ```
 
 ### Task 2: PCM 변환 및 WAV 생성
