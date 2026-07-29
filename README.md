@@ -45,3 +45,13 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - 프로젝트의 기획 및 요구사항을 명세한 PRD.md 문서 추가
 - next.config.ts에 outputFileTracingRoot 설정 추가하여 다중 lockfile 경고 해결
 - 음성 새로 생성 시 이전 완료 문구 및 오디오 플레이어가 즉시 사라지도록 UI 상태 초기화 로직 추가
+- Gemini 오디오 청크를 24kHz/16bit/Mono PCM으로 스트리밍하여 첫 청크부터 자동 재생
+- 생성 중 다시 듣기·다운로드 비활성화, 완료 후 WAV 다시 듣기·다운로드 활성화
+
+## 검증
+
+```bash
+npm test
+npm run lint
+npm run build
+```
