@@ -11,9 +11,8 @@ function lastBoundaryAtOrBefore(
 ): number {
   pattern.lastIndex = 0;
   let boundary = -1;
-  let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(text)) !== null) {
+  while (pattern.exec(text) !== null) {
     if (pattern.lastIndex > limit) break;
     boundary = pattern.lastIndex;
   }
