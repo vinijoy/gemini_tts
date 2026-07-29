@@ -10,6 +10,8 @@ export class StreamingPcmPlayer {
 
   private readonly sources = new Set<AudioBufferSourceNode>();
 
+  private operation: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly createContext: AudioContextFactory = () => new AudioContext(),
     private readonly sampleRate = 24000,
@@ -18,6 +20,10 @@ export class StreamingPcmPlayer {
   async enqueue(samples: Int16Array): Promise<void> {
     if (samples.length === 0) return;
 
+    return this.serialize(() => this.enqueueInternal(samples));
+  }
+
+  private async enqueueInternal(samples: Int16Array): Promise<void> {
     const context = this.context ?? this.createContext();
     this.context = context;
     if (context.state === "suspended") await context.resume();
@@ -31,28 +37,62 @@ export class StreamingPcmPlayer {
     source.onended = () => this.sources.delete(source);
 
     const startAt = Math.max(context.currentTime, this.nextStartTime);
-    source.start(startAt);
-    this.nextStartTime = startAt + buffer.duration;
     this.sources.add(source);
+    try {
+      source.start(startAt);
+      this.nextStartTime = startAt + buffer.duration;
+    } catch (error) {
+      this.sources.delete(source);
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
-    for (const source of this.sources) {
-      try {
-        source.stop();
-      } catch (error) {
-        if (!(error instanceof DOMException) || error.name !== "InvalidStateError") {
-          throw error;
+    return this.serialize(() => this.closeInternal());
+  }
+
+  private async closeInternal(): Promise<void> {
+    const context = this.context;
+    const errors: unknown[] = [];
+
+    try {
+      for (const source of Array.from(this.sources)) {
+        try {
+          source.stop();
+        } catch (error) {
+          if (
+            !(error instanceof DOMException) ||
+            error.name !== "InvalidStateError"
+          ) {
+            errors.push(error);
+          }
         }
       }
-    }
-    this.sources.clear();
-
-    if (this.context && this.context.state !== "closed") {
-      await this.context.close();
+    } finally {
+      this.sources.clear();
     }
 
-    this.context = null;
-    this.nextStartTime = 0;
+    try {
+      if (context && context.state !== "closed") {
+        await context.close();
+      }
+    } catch (error) {
+      errors.push(error);
+    } finally {
+      if (this.context === context) {
+        this.context = null;
+        this.nextStartTime = 0;
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "오디오 재생기를 정리하지 못했습니다.");
+    }
+  }
+
+  private serialize(operation: () => Promise<void>): Promise<void> {
+    const result = this.operation.then(operation);
+    this.operation = result.catch(() => undefined);
+    return result;
   }
 }
