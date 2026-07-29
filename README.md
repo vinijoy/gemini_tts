@@ -47,6 +47,9 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - 음성 새로 생성 시 이전 완료 문구 및 오디오 플레이어가 즉시 사라지도록 UI 상태 초기화 로직 추가
 - Gemini 오디오 청크를 24kHz/16bit/Mono PCM으로 스트리밍하여 첫 청크부터 자동 재생
 - 생성 중 다시 듣기·다운로드 비활성화, 완료 후 WAV 다시 듣기·다운로드 활성화
+- 긴 원고를 최대 800자의 문장 경계 조각으로 나누어 Gemini TTS에 순차 요청하고, 각 24kHz PCM 응답을 하나의 스트림으로 연결
+- Gemini 응답의 종료 사유를 검사하여 출력 한도 등으로 잘린 부분 오디오가 완성본으로 표시되지 않도록 차단
+- 생성 중과 완료 후 다시 듣기에 동일한 Web Audio 재생 경로와 동일 PCM을 사용하여 재생 음질 일치
 
 ## 검증
 
