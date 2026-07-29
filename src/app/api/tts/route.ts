@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import { preparePcmStream } from "./stream";
+import { prepareSequentialPcmStream } from "./stream";
+import { splitTranscript } from "./transcript";
 
 // API 키 로드 로직 (기존 유지)
 let apiKey = process.env.GEMINI_API_KEY;
@@ -60,12 +61,23 @@ function linkRequestAbort(
   };
 }
 
+function responseContainsAudio(response: GenerateContentResponse): boolean {
+  return (response.candidates ?? []).some((candidate) =>
+    (candidate.content?.parts ?? []).some(
+      (part) => Boolean(part.inlineData?.data),
+    ),
+  );
+}
+
 async function waitForRetry(
   delayMs: number,
   requestSignal: AbortSignal,
+  streamSignal?: AbortSignal,
 ): Promise<void> {
-  if (requestSignal.aborted) {
-    throw createRequestAbortError(requestSignal.reason);
+  const abortReason = () =>
+    requestSignal.reason ?? streamSignal?.reason;
+  if (requestSignal.aborted || streamSignal?.aborted) {
+    throw createRequestAbortError(abortReason());
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -78,6 +90,7 @@ async function waitForRetry(
       settled = true;
       clearTimeout(timeout);
       requestSignal.removeEventListener("abort", handleAbort);
+      streamSignal?.removeEventListener("abort", handleAbort);
       if (error) {
         reject(error);
       } else {
@@ -85,15 +98,135 @@ async function waitForRetry(
       }
     };
     const handleAbort = () => {
-      finish(createRequestAbortError(requestSignal.reason));
+      finish(createRequestAbortError(abortReason()));
     };
     const timeout = setTimeout(() => finish(), delayMs);
 
     requestSignal.addEventListener("abort", handleAbort, { once: true });
-    if (requestSignal.aborted) {
+    streamSignal?.addEventListener("abort", handleAbort, { once: true });
+    if (requestSignal.aborted || streamSignal?.aborted) {
       handleAbort();
     }
   });
+}
+
+function createPrompt(transcript: string, stylePrompt?: string): string {
+  let instructions =
+    "Synthesize speech for the performance defined below.\nThe profile, scene, and performance notes are direction only. Do NOT speak them.\nSpeak ONLY the lines under #### TRANSCRIPT.";
+
+  if (stylePrompt?.trim()) {
+    instructions += `\n\nPerformance Notes: ${stylePrompt.trim()}`;
+  }
+
+  return `${instructions}\n\n#### TRANSCRIPT\n${transcript}`;
+}
+
+function createRetriedAudioSource(
+  transcript: string,
+  selectedVoice: string,
+  stylePrompt: string | undefined,
+  requestSignal: AbortSignal,
+  streamSignal: AbortSignal,
+): AsyncIterable<GenerateContentResponse> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      const maxRetries = 2;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        const attemptController = new AbortController();
+        const unlinkRequestAbort = linkRequestAbort(
+          requestSignal,
+          attemptController,
+        );
+        const unlinkStreamAbort = linkRequestAbort(
+          streamSignal,
+          attemptController,
+        );
+        let iterator:
+          | AsyncIterator<GenerateContentResponse>
+          | undefined;
+        let iteratorFinished = false;
+        let emittedAudio = false;
+        let completedSuccessfully = false;
+
+        try {
+          if (requestSignal.aborted || streamSignal.aborted) {
+            throw createRequestAbortError(
+              requestSignal.reason ?? streamSignal.reason,
+            );
+          }
+
+          const responses = await ai.models.generateContentStream({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: createPrompt(transcript, stylePrompt) }],
+              },
+            ],
+            config: {
+              abortSignal: attemptController.signal,
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: selectedVoice,
+                  },
+                },
+              },
+            },
+          });
+          iterator = responses[Symbol.asyncIterator]();
+
+          while (true) {
+            const result = await iterator.next();
+            if (result.done) {
+              iteratorFinished = true;
+              if (!emittedAudio) {
+                throw new Error("오디오 데이터가 없습니다.");
+              }
+              completedSuccessfully = true;
+              return;
+            }
+
+            if (responseContainsAudio(result.value)) {
+              emittedAudio = true;
+            }
+            yield result.value;
+          }
+        } catch (error) {
+          if (requestSignal.aborted || streamSignal.aborted) {
+            throw createRequestAbortError(error);
+          }
+          if (emittedAudio) {
+            throw error;
+          }
+          if (attempt >= maxRetries) {
+            throw new Error(STREAM_START_ERROR, { cause: error });
+          }
+        } finally {
+          unlinkRequestAbort();
+          unlinkStreamAbort();
+          if (iterator && !iteratorFinished) {
+            try {
+              await iterator.return?.();
+            } catch {
+              // 생성 또는 전송 오류를 iterator 정리 오류로 덮어쓰지 않는다.
+            }
+          }
+          if (!completedSuccessfully) {
+            attemptController.abort();
+          }
+        }
+
+        await waitForRetry(
+          1000 * (attempt + 1),
+          requestSignal,
+          streamSignal,
+        );
+      }
+    },
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -109,75 +242,37 @@ export async function POST(req: NextRequest) {
     }
 
     const selectedVoice = voice || "Puck";
-
-    // 지침 메시지 구성 (Gemini 3.1 TTS 권장 구조 적용)
-    let instructions =
-      "Synthesize speech for the performance defined below.\nThe profile, scene, and performance notes are direction only. Do NOT speak them.\nSpeak ONLY the lines under #### TRANSCRIPT.";
-
-    // 사용자가 입력한 stylePrompt(감정/상황)가 있다면 지침에 추가
-    if (stylePrompt && stylePrompt.trim() !== "") {
-      instructions += `\n\nPerformance Notes: ${stylePrompt.trim()}`;
+    const streamController = new AbortController();
+    const abortStream = () => streamController.abort(req.signal.reason);
+    if (req.signal.aborted) {
+      abortStream();
+    } else {
+      req.signal.addEventListener("abort", abortStream, { once: true });
     }
-
-    const prompt = `${instructions}\n\n#### TRANSCRIPT\n${text}`;
-
-    const maxRetries = 2;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-      const abortController = new AbortController();
-      const unlinkRequestAbort = linkRequestAbort(
+    const sources = splitTranscript(text).map((transcript) =>
+      createRetriedAudioSource(
+        transcript,
+        selectedVoice,
+        stylePrompt,
         req.signal,
-        abortController,
-      );
+        streamController.signal,
+      ),
+    );
+    const stream = await prepareSequentialPcmStream(
+      sources,
+      streamController,
+    );
 
-      try {
-        if (req.signal.aborted) {
-          throw createRequestAbortError(req.signal.reason);
-        }
-
-        const responses = await ai.models.generateContentStream({
-          model: "gemini-3.1-flash-tts-preview",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          config: {
-            abortSignal: abortController.signal,
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: selectedVoice,
-                },
-              },
-            },
-          },
-        });
-        const stream = await preparePcmStream(responses, abortController);
-
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "X-Audio-Encoding": "PCM_S16LE",
-            "X-Audio-Sample-Rate": "24000",
-            "X-Audio-Channels": "1",
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-store, no-transform",
-          },
-        });
-      } catch (error: unknown) {
-        abortController.abort(error);
-        if (req.signal.aborted) {
-          throw createRequestAbortError(error);
-        }
-        if (attempt >= maxRetries) {
-          throw new Error(STREAM_START_ERROR, { cause: error });
-        }
-      } finally {
-        unlinkRequestAbort();
-      }
-
-      await waitForRetry(1000 * (attempt + 1), req.signal);
-    }
-
-    throw new Error(STREAM_START_ERROR);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-Audio-Encoding": "PCM_S16LE",
+        "X-Audio-Sample-Rate": "24000",
+        "X-Audio-Channels": "1",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store, no-transform",
+      },
+    });
   } catch (error: unknown) {
     console.error("TTS API Error:", error);
     return NextResponse.json(

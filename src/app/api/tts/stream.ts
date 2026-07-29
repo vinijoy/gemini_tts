@@ -161,11 +161,10 @@ export function createPcmStream(
   );
 }
 
-export function createSequentialPcmStream(
+function createSequentialResponses(
   sources: AsyncIterable<AudioResponse>[],
-  abortController?: AbortController,
-): ReadableStream<Uint8Array> {
-  async function* sequentialResponses(): AsyncGenerator<AudioResponse> {
+): AsyncGenerator<AudioResponse> {
+  return (async function* sequentialResponses() {
     for (let index = 0; index < sources.length; index += 1) {
       let emittedAudio = false;
       let sourceByteLength = 0;
@@ -193,9 +192,24 @@ export function createSequentialPcmStream(
         );
       }
     }
-  }
+  })();
+}
 
-  return createPcmStream(sequentialResponses(), abortController);
+export function createSequentialPcmStream(
+  sources: AsyncIterable<AudioResponse>[],
+  abortController?: AbortController,
+): ReadableStream<Uint8Array> {
+  return createPcmStream(createSequentialResponses(sources), abortController);
+}
+
+export function prepareSequentialPcmStream(
+  sources: AsyncIterable<AudioResponse>[],
+  abortController: AbortController,
+): Promise<ReadableStream<Uint8Array>> {
+  return preparePcmStream(
+    createSequentialResponses(sources),
+    abortController,
+  );
 }
 
 export async function preparePcmStream(

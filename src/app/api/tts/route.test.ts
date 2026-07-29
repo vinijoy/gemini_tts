@@ -15,15 +15,18 @@ vi.mock("@google/genai", () => ({
 }));
 
 afterEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
-function createRequest(signal?: AbortSignal): NextRequest {
+function createRequest(
+  signal?: AbortSignal,
+  text = "안녕하세요",
+): NextRequest {
   return new NextRequest("http://localhost/api/tts", {
     method: "POST",
-    body: JSON.stringify({ text: "안녕하세요", voice: "Puck" }),
+    body: JSON.stringify({ text, voice: "Puck" }),
     headers: { "Content-Type": "application/json" },
     signal,
   });
@@ -45,7 +48,6 @@ it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
       config?: { abortSignal?: AbortSignal };
     }
   ).config?.abortSignal;
-  requestController.abort();
 
   expect(response.status).toBe(200);
   expect(sdkSignal?.aborted).toBe(false);
@@ -75,6 +77,97 @@ it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
         },
       }),
     }),
+  );
+  requestController.abort();
+});
+
+it("긴 원고를 문장 경계로 나누어 PCM을 요청 순서대로 결합한다", async () => {
+  const firstTranscript = `${"가".repeat(790)}.`;
+  const secondTranscript = `${"나".repeat(20)}.`;
+  gemini.generateContentStream
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: { parts: [{ inlineData: { data: "AAE=" } }] },
+            },
+          ],
+        };
+      })(),
+    )
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: { parts: [{ inlineData: { data: "AgM=" } }] },
+            },
+          ],
+        };
+      })(),
+    );
+
+  const response = await POST(
+    createRequest(undefined, `${firstTranscript} ${secondTranscript}`),
+  );
+
+  expect(
+    Array.from(new Uint8Array(await response.arrayBuffer())),
+  ).toEqual([0, 1, 2, 3]);
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+
+  const prompts = gemini.generateContentStream.mock.calls.map(
+    ([parameters]) =>
+      (
+        parameters as {
+          contents: Array<{ parts: Array<{ text: string }> }>;
+        }
+      ).contents[0].parts[0].text,
+  );
+  expect(prompts[0]).toContain(`#### TRANSCRIPT\n${firstTranscript}`);
+  expect(prompts[0]).not.toContain(secondTranscript);
+  expect(prompts[1]).toContain(`#### TRANSCRIPT\n${secondTranscript}`);
+  expect(prompts[1]).not.toContain(firstTranscript);
+});
+
+it("후속 원고 조각이 출력 한도로 종료되면 완성 스트림을 거부한다", async () => {
+  const firstTranscript = `${"가".repeat(790)}.`;
+  const secondTranscript = `${"나".repeat(20)}.`;
+  gemini.generateContentStream
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: { parts: [{ inlineData: { data: "AAE=" } }] },
+            },
+          ],
+        };
+      })(),
+    )
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "MAX_TOKENS",
+              content: { parts: [{ inlineData: { data: "AgM=" } }] },
+            },
+          ],
+        };
+      })(),
+    );
+
+  const response = await POST(
+    createRequest(undefined, `${firstTranscript} ${secondTranscript}`),
+  );
+
+  await expect(response.arrayBuffer()).rejects.toThrow(
+    "출력 한도에 도달해 음성이 중간에 잘렸습니다.",
   );
 });
 
@@ -217,7 +310,8 @@ it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", 
     return streamingResponses();
   });
 
-  const response = await POST(createRequest());
+  const longText = `${"가".repeat(790)}. ${"나".repeat(20)}.`;
+  const response = await POST(createRequest(undefined, longText));
   const reader = response.body?.getReader();
   if (!reader) throw new Error("응답 스트림 reader가 없습니다.");
   await expect(reader.read()).resolves.toEqual({
@@ -229,4 +323,5 @@ it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", 
 
   expect(sdkSignal?.aborted).toBe(true);
   expect(returnCallCount).toBe(1);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
 });
