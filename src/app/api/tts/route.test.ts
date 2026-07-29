@@ -20,11 +20,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function createRequest(): NextRequest {
+function createRequest(signal?: AbortSignal): NextRequest {
   return new NextRequest("http://localhost/api/tts", {
     method: "POST",
     body: JSON.stringify({ text: "안녕하세요", voice: "Puck" }),
     headers: { "Content-Type": "application/json" },
+    signal,
   });
 }
 
@@ -35,11 +36,19 @@ async function* audioResponses() {
 }
 
 it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
+  const requestController = new AbortController();
   gemini.generateContentStream.mockResolvedValue(audioResponses());
 
-  const response = await POST(createRequest());
+  const response = await POST(createRequest(requestController.signal));
+  const sdkSignal = (
+    gemini.generateContentStream.mock.calls[0]?.[0] as {
+      config?: { abortSignal?: AbortSignal };
+    }
+  ).config?.abortSignal;
+  requestController.abort();
 
   expect(response.status).toBe(200);
+  expect(sdkSignal?.aborted).toBe(false);
   expect(response.headers.get("Content-Type")).toBe("application/octet-stream");
   expect(response.headers.get("X-Audio-Encoding")).toBe("PCM_S16LE");
   expect(response.headers.get("X-Audio-Sample-Rate")).toBe("24000");
@@ -109,3 +118,66 @@ it.each([
     }
   },
 );
+
+it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하고 종료한다", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const requestController = new AbortController();
+  let sdkSignal: AbortSignal | undefined;
+  let markPending!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    markPending = resolve;
+  });
+  let returnCallCount = 0;
+
+  gemini.generateContentStream.mockImplementation(async (parameters) => {
+    sdkSignal = (
+      parameters as { config?: { abortSignal?: AbortSignal } }
+    ).config?.abortSignal;
+
+    async function* pendingResponses() {
+      await new Promise<void>((_resolve, reject) => {
+        if (sdkSignal?.aborted) {
+          reject(sdkSignal.reason);
+          return;
+        }
+        sdkSignal?.addEventListener("abort", () => reject(sdkSignal?.reason), {
+          once: true,
+        });
+        markPending();
+      });
+    }
+
+    const nativeIterator = pendingResponses();
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          next: () => nativeIterator.next(),
+          return: async () => {
+            returnCallCount += 1;
+            return nativeIterator.return(undefined);
+          },
+        };
+      },
+    };
+  });
+
+  const responsePromise = POST(createRequest(requestController.signal));
+  await pending;
+  requestController.abort(new DOMException("요청 취소", "AbortError"));
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race([
+    responsePromise.then(() => "settled" as const),
+    new Promise<"timeout">((resolve) => {
+      timeout = setTimeout(() => resolve("timeout"), 250);
+    }),
+  ]);
+  if (timeout) {
+    clearTimeout(timeout);
+  }
+
+  expect(outcome).toBe("settled");
+  expect(sdkSignal?.aborted).toBe(true);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+  expect(returnCallCount).toBe(1);
+});

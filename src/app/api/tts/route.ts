@@ -35,6 +35,66 @@ function getErrorMessage(error: unknown): string {
 
 const STREAM_START_ERROR =
   "음성 생성 스트림을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const REQUEST_ABORT_ERROR = "음성 생성 요청이 취소되었습니다.";
+
+function createRequestAbortError(cause?: unknown): Error {
+  return new Error(REQUEST_ABORT_ERROR, { cause });
+}
+
+function linkRequestAbort(
+  requestSignal: AbortSignal,
+  attemptController: AbortController,
+): () => void {
+  const abortAttempt = () => {
+    attemptController.abort(requestSignal.reason);
+  };
+
+  if (requestSignal.aborted) {
+    abortAttempt();
+  } else {
+    requestSignal.addEventListener("abort", abortAttempt, { once: true });
+  }
+
+  return () => {
+    requestSignal.removeEventListener("abort", abortAttempt);
+  };
+}
+
+async function waitForRetry(
+  delayMs: number,
+  requestSignal: AbortSignal,
+): Promise<void> {
+  if (requestSignal.aborted) {
+    throw createRequestAbortError(requestSignal.reason);
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeout);
+      requestSignal.removeEventListener("abort", handleAbort);
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+    const handleAbort = () => {
+      finish(createRequestAbortError(requestSignal.reason));
+    };
+    const timeout = setTimeout(() => finish(), delayMs);
+
+    requestSignal.addEventListener("abort", handleAbort, { once: true });
+    if (requestSignal.aborted) {
+      handleAbort();
+    }
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,8 +125,16 @@ export async function POST(req: NextRequest) {
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const abortController = new AbortController();
+      const unlinkRequestAbort = linkRequestAbort(
+        req.signal,
+        abortController,
+      );
 
       try {
+        if (req.signal.aborted) {
+          throw createRequestAbortError(req.signal.reason);
+        }
+
         const responses = await ai.models.generateContentStream({
           model: "gemini-3.1-flash-tts-preview",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -95,14 +163,18 @@ export async function POST(req: NextRequest) {
           },
         });
       } catch (error: unknown) {
-        abortController.abort();
+        abortController.abort(error);
+        if (req.signal.aborted) {
+          throw createRequestAbortError(error);
+        }
         if (attempt >= maxRetries) {
           throw new Error(STREAM_START_ERROR, { cause: error });
         }
-        await new Promise((resolve) =>
-          setTimeout(resolve, 1000 * (attempt + 1)),
-        );
+      } finally {
+        unlinkRequestAbort();
       }
+
+      await waitForRetry(1000 * (attempt + 1), req.signal);
     }
 
     throw new Error(STREAM_START_ERROR);
