@@ -28,6 +28,17 @@ interface TtsRequestBody {
   stylePrompt?: string;
 }
 
+class TtsHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    cause?: unknown,
+  ) {
+    super(message, { cause });
+    this.name = "TtsHttpError";
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
@@ -37,6 +48,68 @@ function getErrorMessage(error: unknown): string {
 const STREAM_START_ERROR =
   "음성 생성 스트림을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const REQUEST_ABORT_ERROR = "음성 생성 요청이 취소되었습니다.";
+const DAILY_QUOTA_ERROR =
+  "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있으며, 장문 원고는 300자 조각마다 요청 1회를 사용합니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.";
+const RATE_LIMIT_ERROR =
+  "Gemini API 요청이 잠시 제한되었습니다. 잠시 기다린 뒤 다시 시도해 주세요.";
+
+function getExternalErrorDetails(error: unknown): string {
+  const details: string[] = [];
+  let current = error;
+
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (current instanceof Error) {
+      details.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "object") {
+      const data = current as { cause?: unknown; message?: unknown };
+      if (typeof data.message === "string") {
+        details.push(data.message);
+      }
+      current = data.cause;
+      continue;
+    }
+    break;
+  }
+
+  return details.join("\n");
+}
+
+function getExternalErrorStatus(error: unknown): number | null {
+  let current = error;
+
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (typeof current !== "object") break;
+    const data = current as {
+      cause?: unknown;
+      code?: unknown;
+      status?: unknown;
+    };
+    if (data.status === 429 || data.code === 429) return 429;
+    current = data.cause;
+  }
+
+  return null;
+}
+
+function createQuotaError(error: unknown): TtsHttpError | null {
+  if (getExternalErrorStatus(error) !== 429) {
+    return null;
+  }
+
+  const details = getExternalErrorDetails(error);
+  const isDailyFreeTierLimit =
+    /generate_content_free_tier_requests|GenerateRequestsPerDay/i.test(
+      details,
+    );
+  return new TtsHttpError(
+    429,
+    isDailyFreeTierLimit ? DAILY_QUOTA_ERROR : RATE_LIMIT_ERROR,
+    error,
+  );
+}
 
 function createRequestAbortError(cause?: unknown): Error {
   return new Error(REQUEST_ABORT_ERROR, { cause });
@@ -198,6 +271,10 @@ function createRetriedAudioSource(
           if (requestSignal.aborted || streamSignal.aborted) {
             throw createRequestAbortError(error);
           }
+          const quotaError = createQuotaError(error);
+          if (quotaError) {
+            throw quotaError;
+          }
           if (emittedAudio) {
             throw error;
           }
@@ -274,10 +351,14 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    console.error("TTS API Error:", error);
+    if (error instanceof TtsHttpError) {
+      console.error(`TTS API Error (${error.status}): ${error.message}`);
+    } else {
+      console.error("TTS API Error:", error);
+    }
     return NextResponse.json(
       { error: getErrorMessage(error) },
-      { status: 500 },
+      { status: error instanceof TtsHttpError ? error.status : 500 },
     );
   }
 }

@@ -212,6 +212,29 @@ it.each([
   },
 );
 
+it("429 일일 할당량 오류는 재시도하지 않고 한국어 해결 방법을 반환한다", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const quotaError = Object.assign(
+    new Error(
+      "Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 10, model: gemini-3.1-flash-tts",
+    ),
+    { status: 429 },
+  );
+  gemini.generateContentStream.mockRejectedValue(quotaError);
+
+  const responsePromise = POST(createRequest());
+  await vi.runAllTimersAsync();
+  const response = await responsePromise;
+
+  expect(response.status).toBe(429);
+  await expect(response.json()).resolves.toEqual({
+    error:
+      "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있으며, 장문 원고는 300자 조각마다 요청 1회를 사용합니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.",
+  });
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+});
+
 it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하고 종료한다", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const requestController = new AbortController();

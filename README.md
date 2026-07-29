@@ -50,6 +50,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - 긴 원고를 최대 300자의 문장 경계 조각으로 나누어 Gemini TTS에 순차 요청하고, 각 24kHz PCM 응답을 하나의 스트림으로 연결
 - Gemini 응답의 종료 사유를 검사하여 출력 한도 등으로 잘린 부분 오디오가 완성본으로 표시되지 않도록 차단
 - 생성 중과 완료 후 다시 듣기에 동일한 Web Audio 재생 경로와 동일 PCM을 사용하여 재생 음질 일치
+- 장문 원고는 300자 조각마다 Gemini API 요청 1회를 사용하므로 무료 티어의 일일 요청 한도에 더 빨리 도달할 수 있음
+- Gemini 429 할당량 오류는 재시도하지 않고 무료 일일 한도 또는 결제 설정을 확인할 수 있는 한국어 안내로 즉시 반환
 
 ## 검증
 
