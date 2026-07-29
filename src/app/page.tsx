@@ -6,6 +6,35 @@ import { StreamingPcmPlayer } from "@/utils/streaming-player";
 
 type GenerationStatus = "idle" | "streaming" | "complete";
 
+const DEFAULT_SERVER_ERROR_MESSAGE =
+  "음성 생성 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+
+function normalizeServerErrorText(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, 200) : null;
+}
+
+function createServerErrorMessage(responseBody: string) {
+  try {
+    const parsed = JSON.parse(responseBody) as unknown;
+    if (typeof parsed === "object" && parsed !== null) {
+      const errorData = parsed as { details?: unknown; error?: unknown };
+      const error = normalizeServerErrorText(errorData.error);
+      const details = normalizeServerErrorText(errorData.details);
+      if (error && details) return `${error} (${details})`;
+      if (error) return error;
+      if (details) return `${DEFAULT_SERVER_ERROR_MESSAGE} (${details})`;
+    }
+    return DEFAULT_SERVER_ERROR_MESSAGE;
+  } catch {
+    const safeServerText = normalizeServerErrorText(responseBody);
+    return safeServerText
+      ? `${DEFAULT_SERVER_ERROR_MESSAGE} (서버 응답: ${safeServerText})`
+      : DEFAULT_SERVER_ERROR_MESSAGE;
+  }
+}
+
 function stopCompletedAudio(audio: HTMLAudioElement | null) {
   if (!audio) return;
   try {
@@ -128,11 +157,21 @@ export default function Home() {
         activation = Promise.resolve({ activated: false, cause });
       }
 
-      const previousPlayerClose = previousPlayer
-        ? previousPlayer.close().catch((closeError: unknown) => {
-            console.error("오디오 재생기 정리에 실패했습니다.", closeError);
-          })
-        : Promise.resolve();
+      let previousPlayerClose: Promise<
+        { closed: true } | { closed: false; cause: unknown }
+      >;
+      if (previousPlayer) {
+        try {
+          previousPlayerClose = previousPlayer.close().then(
+            () => ({ closed: true as const }),
+            (cause: unknown) => ({ closed: false as const, cause }),
+          );
+        } catch (cause) {
+          previousPlayerClose = Promise.resolve({ closed: false, cause });
+        }
+      } else {
+        previousPlayerClose = Promise.resolve({ closed: true });
+      }
 
       const activationResult = await activation;
       if (!activationResult.activated) {
@@ -142,7 +181,13 @@ export default function Home() {
         );
       }
 
-      await previousPlayerClose;
+      const previousPlayerCloseResult = await previousPlayerClose;
+      if (!previousPlayerCloseResult.closed) {
+        throw new Error(
+          "이전 오디오 재생을 종료하지 못했습니다. 새 음성을 생성하지 않았습니다. 잠시 후 다시 시도해 주세요.",
+          { cause: previousPlayerCloseResult.cause },
+        );
+      }
       if (requestIdRef.current !== requestId) return;
 
       const response = await fetch("/api/tts", {
@@ -157,21 +202,15 @@ export default function Home() {
       if (requestIdRef.current !== requestId) return;
 
       if (!response.ok) {
-        let errorMessage = "응답 처리 중 에러가 발생했어!";
+        let responseBody = "";
         try {
-          const errData = (await response.json()) as {
-            details?: string;
-            error?: string;
-          };
-          errorMessage = errData.details
-            ? `${errData.error} (${errData.details})`
-            : errData.error || errorMessage;
-        } catch {
-          // JSON 파싱 실패 시 텍스트라도 읽어봄
-          const textErr = await response.text();
-          if (textErr) errorMessage = textErr;
+          responseBody = await response.text();
+        } catch (bodyReadError) {
+          throw new Error(DEFAULT_SERVER_ERROR_MESSAGE, {
+            cause: bodyReadError,
+          });
         }
-        throw new Error(errorMessage);
+        throw new Error(createServerErrorMessage(responseBody));
       }
 
       const reader = response.body?.getReader();

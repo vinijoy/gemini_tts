@@ -190,6 +190,37 @@ it("플레이어 활성화가 동기 실패해도 한국어 오류로 정규화�
   expect(player.close).toHaveBeenCalledOnce();
 });
 
+it("비JSON 오류 응답 본문을 한 번만 읽고 한국어 안내로 복구한다", async () => {
+  const errorResponse = new Response("upstream temporarily unavailable", {
+    status: 502,
+    headers: { "Content-Type": "text/plain" },
+  });
+  const readText = vi.spyOn(errorResponse, "text");
+  const readJson = vi.spyOn(errorResponse, "json");
+  vi.mocked(fetch).mockResolvedValueOnce(errorResponse);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const user = userEvent.setup();
+  render(<Home />);
+
+  await user.type(
+    screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
+    "서버 오류를 확인할 음성",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "음성 생성 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요. (서버 응답: upstream temporarily unavailable)",
+  );
+  expect(readText).toHaveBeenCalledOnce();
+  expect(readJson).not.toHaveBeenCalled();
+  expect(errorResponse.bodyUsed).toBe(true);
+  expect(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  ).toBeEnabled();
+});
+
 it("스트림 완료 후 다시 듣기와 WAV 다운로드를 활성화한다", async () => {
   const user = userEvent.setup();
   render(<Home />);
@@ -533,6 +564,59 @@ it("새 생성 전 이전 요청과 플레이어 및 Blob URL을 정리한다", 
       name: "생성된 음성 파일 다운로드",
     }),
   ).toHaveAttribute("href", "blob:second-audio");
+});
+
+it("새 생성 전 이전 플레이어 종료가 실패하면 새 요청을 막고 복구한다", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const abortRequest = vi.spyOn(AbortController.prototype, "abort");
+  const user = userEvent.setup();
+  render(<Home />);
+
+  await user.type(
+    screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
+    "이전 플레이어가 남은 음성",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+  act(() => {
+    streamController.enqueue(Uint8Array.from([0, 0]));
+    closeStream();
+  });
+  await screen.findByRole("link", {
+    name: "생성된 음성 파일 다운로드",
+  });
+
+  vi.mocked(fetch).mockClear();
+  player.activate.mockClear();
+  player.close.mockClear();
+  player.create.mockClear();
+  abortRequest.mockClear();
+  player.close
+    .mockRejectedValueOnce(new Error("AudioContext close failed"))
+    .mockResolvedValueOnce();
+
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "이전 오디오 재생을 종료하지 못했습니다. 새 음성을 생성하지 않았습니다. 잠시 후 다시 시도해 주세요.",
+  );
+  expect(player.create).toHaveBeenCalledOnce();
+  expect(player.activate).toHaveBeenCalledOnce();
+  expect(player.close).toHaveBeenCalledTimes(2);
+  expect(player.activate.mock.invocationCallOrder[0]).toBeLessThan(
+    player.close.mock.invocationCallOrder[0],
+  );
+  expect(fetch).not.toHaveBeenCalled();
+  expect(abortRequest).toHaveBeenCalledTimes(2);
+  expect(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  ).toBeEnabled();
+  expect(
+    screen.queryByRole("link", { name: "생성된 음성 파일 다운로드" }),
+  ).not.toBeInTheDocument();
 });
 
 it("언마운트 시 요청과 플레이어 및 Blob URL을 정리한다", async () => {
