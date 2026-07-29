@@ -12,8 +12,8 @@ try {
       apiKey = match[1].trim();
     }
   }
-} catch (e) {
-  console.error(e);
+} catch (error: unknown) {
+  console.error(error);
 }
 
 const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -24,7 +24,7 @@ async function test() {
   const prompt = `${instructions}\n\n[Text to Read]\n${text}`;
 
   try {
-    const response3 = await ai.models.generateContent({
+    await ai.models.generateContent({
       model: "gemini-2.0-flash-exp",
       contents: prompt,
       config: {
@@ -39,8 +39,12 @@ async function test() {
       },
     });
     console.log("Success with gemini-2.0-flash-exp!");
-  } catch (e: any) {
-    console.error("Error with gemini-2.0-flash-exp:", e.message);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error with gemini-2.0-flash-exp:", error.message);
+    } else {
+      console.error("알 수 없는 오류가 발생했습니다:", error);
+    }
   }
 }
 

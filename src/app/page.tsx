@@ -1,18 +1,148 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PcmChunkAssembler, createWavBlob } from "@/utils/pcm-audio";
+import { StreamingPcmPlayer } from "@/utils/streaming-player";
+
+type GenerationStatus = "idle" | "streaming" | "complete";
+
+const DEFAULT_SERVER_ERROR_MESSAGE =
+  "음성 생성 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+const STREAM_CONNECTION_ERROR_MESSAGE =
+  "음성 생성 중 연결이 끊어졌습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
+
+function normalizeServerErrorText(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, 200) : null;
+}
+
+function createServerErrorMessage(responseBody: string) {
+  try {
+    const parsed = JSON.parse(responseBody) as unknown;
+    if (typeof parsed === "object" && parsed !== null) {
+      const errorData = parsed as { details?: unknown; error?: unknown };
+      const error = normalizeServerErrorText(errorData.error);
+      const details = normalizeServerErrorText(errorData.details);
+      if (error && details) return `${error} (${details})`;
+      if (error) return error;
+      if (details) return `${DEFAULT_SERVER_ERROR_MESSAGE} (${details})`;
+    }
+    return DEFAULT_SERVER_ERROR_MESSAGE;
+  } catch {
+    const safeServerText = normalizeServerErrorText(responseBody);
+    return safeServerText
+      ? `${DEFAULT_SERVER_ERROR_MESSAGE} (서버 응답: ${safeServerText})`
+      : DEFAULT_SERVER_ERROR_MESSAGE;
+  }
+}
+
+function createGenerationErrorMessage(error: unknown) {
+  if (
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  ) {
+    return "음성 생성 요청이 취소되었습니다. 다시 생성해 주세요.";
+  }
+  if (error instanceof Error && /[가-힣]/.test(error.message)) {
+    return error.message;
+  }
+  return STREAM_CONNECTION_ERROR_MESSAGE;
+}
+
+function createDownloadFileName(voice: string, generatedAt: Date) {
+  const date = [
+    String(generatedAt.getFullYear()).slice(2),
+    String(generatedAt.getMonth() + 1).padStart(2, "0"),
+    String(generatedAt.getDate()).padStart(2, "0"),
+  ].join("");
+  const time = [
+    String(generatedAt.getHours()).padStart(2, "0"),
+    String(generatedAt.getMinutes()).padStart(2, "0"),
+    String(generatedAt.getSeconds()).padStart(2, "0"),
+  ].join("");
+  return `gemini_tts_${voice}_${date}_${time}.wav`;
+}
+
+function stopCompletedAudio(audio: HTMLAudioElement | null) {
+  if (!audio) return;
+  try {
+    audio.pause();
+  } catch (pauseError) {
+    console.error("완성된 음성 재생을 중지하지 못했습니다.", pauseError);
+  }
+  try {
+    audio.currentTime = 0;
+  } catch (seekError) {
+    console.error("완성된 음성 재생 위치를 초기화하지 못했습니다.", seekError);
+  }
+}
 
 export default function Home() {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("Puck");
   const [stylePrompt, setStylePrompt] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<GenerationStatus>("idle");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
+  const [downloadFileName, setDownloadFileName] = useState("");
+
   const audioRef = useRef<HTMLAudioElement>(null);
+  const ownedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playerRef = useRef<StreamingPcmPlayer | null>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
+  const replayPromiseRef = useRef<Promise<void> | null>(null);
+  const isLoading = status === "streaming";
+  const statusMessage =
+    status === "streaming"
+      ? hasStartedPlayback
+        ? "음성을 생성하며 재생하고 있습니다."
+        : "음성을 생성하고 있습니다. 준비되면 자동 재생됩니다."
+      : status === "complete"
+        ? "음성 생성이 완료되었습니다."
+        : "";
 
   const voices = ["Puck", "Aoede", "Charon", "Kore", "Fenrir"];
+
+  const setAudioElement = useCallback((audio: HTMLAudioElement | null) => {
+    audioRef.current = audio;
+    if (audio) ownedAudioRef.current = audio;
+  }, []);
+
+  const releaseOwnedAudio = useCallback(() => {
+    const audio = ownedAudioRef.current;
+    ownedAudioRef.current = null;
+    if (audioRef.current === audio) audioRef.current = null;
+    stopCompletedAudio(audio);
+  }, []);
+
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      replayPromiseRef.current = null;
+      releaseOwnedAudio();
+      requestControllerRef.current?.abort();
+      requestControllerRef.current = null;
+
+      const player = playerRef.current;
+      playerRef.current = null;
+      if (player) {
+        void player
+          .close()
+          .catch((closeError: unknown) =>
+            console.error("오디오 재생기 정리에 실패했습니다.", closeError),
+          );
+      }
+
+      const url = audioUrlRef.current;
+      audioUrlRef.current = null;
+      if (url) URL.revokeObjectURL(url);
+    },
+    [releaseOwnedAudio],
+  );
 
   const handleGenerate = async () => {
     if (isLoading) return;
@@ -21,48 +151,223 @@ export default function Home() {
       setError("변환할 텍스트를 입력해주세요.");
       return;
     }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    replayPromiseRef.current = null;
+    releaseOwnedAudio();
     setError(null);
+    setStatus("streaming");
+    setHasStartedPlayback(false);
     setAudioUrl(null);
-    setIsLoading(true);
+    const generatedVoice = voice;
+    setDownloadFileName(createDownloadFileName(generatedVoice, new Date()));
+
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
+
+    const previousPlayer = playerRef.current;
+    playerRef.current = null;
+
+    const previousUrl = audioUrlRef.current;
+    audioUrlRef.current = null;
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+
+    const requestController = new AbortController();
+    requestControllerRef.current = requestController;
+    let player: StreamingPcmPlayer | null = null;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let streamCompleted = false;
 
     try {
+      player = new StreamingPcmPlayer();
+      playerRef.current = player;
+      let activation: Promise<
+        | { activated: true }
+        | { activated: false; cause: unknown }
+      >;
+      try {
+        activation = player.activate().then(
+          () => ({ activated: true as const }),
+          (cause: unknown) => ({ activated: false as const, cause }),
+        );
+      } catch (cause) {
+        activation = Promise.resolve({ activated: false, cause });
+      }
+
+      let previousPlayerClose: Promise<
+        { closed: true } | { closed: false; cause: unknown }
+      >;
+      if (previousPlayer) {
+        try {
+          previousPlayerClose = previousPlayer.close().then(
+            () => ({ closed: true as const }),
+            (cause: unknown) => ({ closed: false as const, cause }),
+          );
+        } catch (cause) {
+          previousPlayerClose = Promise.resolve({ closed: false, cause });
+        }
+      } else {
+        previousPlayerClose = Promise.resolve({ closed: true });
+      }
+
+      const activationResult = await activation;
+      if (!activationResult.activated) {
+        throw new Error(
+          "오디오 자동 재생을 시작하지 못했습니다. 브라우저의 자동 재생 권한을 확인한 뒤 다시 시도해 주세요.",
+          { cause: activationResult.cause },
+        );
+      }
+
+      const previousPlayerCloseResult = await previousPlayerClose;
+      if (!previousPlayerCloseResult.closed) {
+        throw new Error(
+          "이전 오디오 재생을 종료하지 못했습니다. 새 음성을 생성하지 않았습니다. 잠시 후 다시 시도해 주세요.",
+          { cause: previousPlayerCloseResult.cause },
+        );
+      }
+      if (requestIdRef.current !== requestId) return;
+
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text, voice, stylePrompt }),
+        body: JSON.stringify({ text, voice: generatedVoice, stylePrompt }),
+        signal: requestController.signal,
       });
 
+      if (requestIdRef.current !== requestId) return;
+
       if (!response.ok) {
-        let errorMessage = "응답 처리 중 에러가 발생했어!";
+        let responseBody = "";
         try {
-          const errData = await response.json();
-          errorMessage = errData.details ? `${errData.error} (${errData.details})` : errData.error || errorMessage;
-        } catch (e) {
-          // JSON 파싱 실패 시 텍스트라도 읽어봄
-          const textErr = await response.text();
-          if (textErr) errorMessage = textErr;
+          responseBody = await response.text();
+        } catch (bodyReadError) {
+          throw new Error(DEFAULT_SERVER_ERROR_MESSAGE, {
+            cause: bodyReadError,
+          });
         }
-        throw new Error(errorMessage);
+        throw new Error(createServerErrorMessage(responseBody));
       }
 
-      // 백엔드에서 바로 넘겨준 바이너리 데이터를 바탕으로 명시적으로 오디오 Blob을 만듭니다.
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBlob = new Blob([arrayBuffer], { type: "audio/wav" });
-      const url = URL.createObjectURL(audioBlob);
-      
+      reader = response.body?.getReader() ?? null;
+      if (!reader) throw new Error("음성 스트림을 열 수 없습니다.");
+
+      const assembler = new PcmChunkAssembler();
+      let playbackStarted = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (requestIdRef.current !== requestId) return;
+        if (done) {
+          streamCompleted = true;
+          break;
+        }
+        const samples = assembler.push(value);
+        await player.enqueue(samples);
+        if (!playbackStarted && samples.length > 0) {
+          playbackStarted = true;
+          setHasStartedPlayback(true);
+        }
+      }
+
+      const pcmBytes = assembler.getBytes();
+      if (pcmBytes.length === 0) {
+        throw new Error("생성된 오디오 데이터가 없습니다.");
+      }
+
+      const url = URL.createObjectURL(createWavBlob(pcmBytes));
+      audioUrlRef.current = url;
       setAudioUrl(url);
-    } catch (err: any) {
+      setStatus("complete");
+    } catch (err: unknown) {
+      if (requestControllerRef.current === requestController) {
+        requestController.abort();
+        requestControllerRef.current = null;
+      }
+
+      if (player && playerRef.current === player) {
+        playerRef.current = null;
+        try {
+          await player.close();
+        } catch (closeError) {
+          console.error("오디오 재생기 정리에 실패했습니다.", closeError);
+        }
+      }
+
+      if (requestIdRef.current !== requestId) return;
+
       console.error(err);
-      setError(err.message || "음성 생성에 실패했습니다. API 설정 및 네트워크를 확인해주세요.");
+      setError(createGenerationErrorMessage(err));
+      setHasStartedPlayback(false);
+      setStatus("idle");
     } finally {
-      setIsLoading(false);
+      if (reader) {
+        if (!streamCompleted) {
+          try {
+            await reader.cancel();
+          } catch (cancelError) {
+            console.error("음성 스트림 취소에 실패했습니다.", cancelError);
+          }
+        }
+        try {
+          reader.releaseLock();
+        } catch (releaseError) {
+          console.error("음성 스트림 잠금 해제에 실패했습니다.", releaseError);
+        }
+      }
     }
   };
 
-  const now = new Date();
-  const timeString = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  const handleReplay = () => {
+    if (replayPromiseRef.current) return;
+
+    const replayRequestId = requestIdRef.current;
+    const replayUrl = audioUrlRef.current;
+    const replayAudio = audioRef.current;
+    if (!replayUrl || !replayAudio) return;
+    const ownsReplay = () =>
+      requestIdRef.current === replayRequestId &&
+      audioUrlRef.current === replayUrl &&
+      audioRef.current === replayAudio;
+
+    const replay = (async () => {
+      const player = playerRef.current;
+      if (player) {
+        try {
+          await player.close();
+        } catch (closeError) {
+          console.error("스트리밍 재생을 중지하지 못했습니다.", closeError);
+          if (ownsReplay()) {
+            setError(
+              "스트리밍 재생을 중지하지 못해 다시 듣기를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+            );
+          }
+          return;
+        }
+        if (playerRef.current === player) playerRef.current = null;
+      }
+
+      if (!ownsReplay()) return;
+      replayAudio.currentTime = 0;
+      await replayAudio.play();
+    })().catch((playError: unknown) => {
+      console.error("완성된 음성을 재생하지 못했습니다.", playError);
+      if (ownsReplay()) {
+        setError(
+          "완성된 음성을 재생하지 못했습니다. 브라우저의 오디오 설정을 확인해 주세요.",
+        );
+      }
+    });
+
+    replayPromiseRef.current = replay;
+    void replay.then(() => {
+      if (replayPromiseRef.current === replay) {
+        replayPromiseRef.current = null;
+      }
+    });
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-100 flex flex-col items-center justify-center p-6 text-gray-800">
@@ -161,9 +466,8 @@ export default function Home() {
             />
           </div>
 
-          {/* 스크린리더 전용 진행 상태 알림 */}
-          <div aria-live="polite" className="sr-only">
-            {isLoading ? "음성 생성을 시작했습니다. 잠시만 기다려주세요." : ""}
+          <div role="status" aria-live="polite" className="sr-only">
+            {statusMessage}
           </div>
 
           {/* 버튼부 */}
@@ -189,26 +493,44 @@ export default function Home() {
           )}
 
           {/* 결과물 출력부 */}
-          {audioUrl && (
+          {status !== "idle" && (
             <div className="mt-8 p-6 bg-white/80 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center space-y-4">
-              <h2 className="text-lg font-bold text-gray-700">음성 생성이 완료되었습니다.</h2>
-              <audio
-                key={audioUrl}
-                ref={audioRef}
-                controls
-                autoPlay
-                src={audioUrl}
-                className="w-full"
-                aria-label="생성된 음성 재생기"
-              />
-              <a
-                href={audioUrl}
-                download={`gemini_tts_${voice}_${timeString}.wav`}
-                className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold hover:bg-pink-200 transition-colors"
-                aria-label="생성된 음성 파일 다운로드"
+              <h2 className="text-lg font-bold text-gray-700">
+                {statusMessage}
+              </h2>
+              <button
+                type="button"
+                disabled={status !== "complete" || !audioUrl}
+                onClick={handleReplay}
+                aria-label="다시 듣기"
+                className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold disabled:bg-gray-200 disabled:text-gray-500"
               >
-                음성 파일 다운로드 💾
-              </a>
+                다시 듣기
+              </button>
+              {status === "complete" && audioUrl ? (
+                <>
+                  <audio
+                    ref={setAudioElement}
+                    src={audioUrl}
+                    preload="metadata"
+                  />
+                  <a
+                    href={audioUrl}
+                    download={downloadFileName}
+                    className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold hover:bg-pink-200 transition-colors"
+                    aria-label="생성된 음성 파일 다운로드"
+                  >
+                    음성 파일 다운로드 💾
+                  </a>
+                </>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="px-6 py-2 rounded-full bg-gray-200 text-gray-500 font-semibold"
+                >
+                  음성 생성이 끝나면 다운로드할 수 있습니다.
+                </span>
+              )}
             </div>
           )}
         </section>
