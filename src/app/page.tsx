@@ -8,6 +8,8 @@ type GenerationStatus = "idle" | "streaming" | "complete";
 
 const DEFAULT_SERVER_ERROR_MESSAGE =
   "음성 생성 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+const STREAM_CONNECTION_ERROR_MESSAGE =
+  "음성 생성 중 연결이 끊어졌습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.";
 
 function normalizeServerErrorText(value: unknown) {
   if (typeof value !== "string") return null;
@@ -35,6 +37,33 @@ function createServerErrorMessage(responseBody: string) {
   }
 }
 
+function createGenerationErrorMessage(error: unknown) {
+  if (
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  ) {
+    return "음성 생성 요청이 취소되었습니다. 다시 생성해 주세요.";
+  }
+  if (error instanceof Error && /[가-힣]/.test(error.message)) {
+    return error.message;
+  }
+  return STREAM_CONNECTION_ERROR_MESSAGE;
+}
+
+function createDownloadFileName(voice: string, generatedAt: Date) {
+  const date = [
+    String(generatedAt.getFullYear()).slice(2),
+    String(generatedAt.getMonth() + 1).padStart(2, "0"),
+    String(generatedAt.getDate()).padStart(2, "0"),
+  ].join("");
+  const time = [
+    String(generatedAt.getHours()).padStart(2, "0"),
+    String(generatedAt.getMinutes()).padStart(2, "0"),
+    String(generatedAt.getSeconds()).padStart(2, "0"),
+  ].join("");
+  return `gemini_tts_${voice}_${date}_${time}.wav`;
+}
+
 function stopCompletedAudio(audio: HTMLAudioElement | null) {
   if (!audio) return;
   try {
@@ -56,6 +85,8 @@ export default function Home() {
   const [status, setStatus] = useState<GenerationStatus>("idle");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
+  const [downloadFileName, setDownloadFileName] = useState("");
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const ownedAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -67,7 +98,9 @@ export default function Home() {
   const isLoading = status === "streaming";
   const statusMessage =
     status === "streaming"
-      ? "음성을 생성하며 재생하고 있습니다."
+      ? hasStartedPlayback
+        ? "음성을 생성하며 재생하고 있습니다."
+        : "음성을 생성하고 있습니다. 준비되면 자동 재생됩니다."
       : status === "complete"
         ? "음성 생성이 완료되었습니다."
         : "";
@@ -125,7 +158,10 @@ export default function Home() {
     releaseOwnedAudio();
     setError(null);
     setStatus("streaming");
+    setHasStartedPlayback(false);
     setAudioUrl(null);
+    const generatedVoice = voice;
+    setDownloadFileName(createDownloadFileName(generatedVoice, new Date()));
 
     requestControllerRef.current?.abort();
     requestControllerRef.current = null;
@@ -140,6 +176,8 @@ export default function Home() {
     const requestController = new AbortController();
     requestControllerRef.current = requestController;
     let player: StreamingPcmPlayer | null = null;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let streamCompleted = false;
 
     try {
       player = new StreamingPcmPlayer();
@@ -195,7 +233,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text, voice, stylePrompt }),
+        body: JSON.stringify({ text, voice: generatedVoice, stylePrompt }),
         signal: requestController.signal,
       });
 
@@ -213,16 +251,25 @@ export default function Home() {
         throw new Error(createServerErrorMessage(responseBody));
       }
 
-      const reader = response.body?.getReader();
+      reader = response.body?.getReader() ?? null;
       if (!reader) throw new Error("음성 스트림을 열 수 없습니다.");
 
       const assembler = new PcmChunkAssembler();
+      let playbackStarted = false;
 
       while (true) {
         const { value, done } = await reader.read();
         if (requestIdRef.current !== requestId) return;
-        if (done) break;
-        await player.enqueue(assembler.push(value));
+        if (done) {
+          streamCompleted = true;
+          break;
+        }
+        const samples = assembler.push(value);
+        await player.enqueue(samples);
+        if (!playbackStarted && samples.length > 0) {
+          playbackStarted = true;
+          setHasStartedPlayback(true);
+        }
       }
 
       const pcmBytes = assembler.getBytes();
@@ -252,12 +299,24 @@ export default function Home() {
       if (requestIdRef.current !== requestId) return;
 
       console.error(err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "음성 생성에 실패했습니다. API 설정 및 네트워크를 확인해주세요.",
-      );
+      setError(createGenerationErrorMessage(err));
+      setHasStartedPlayback(false);
       setStatus("idle");
+    } finally {
+      if (reader) {
+        if (!streamCompleted) {
+          try {
+            await reader.cancel();
+          } catch (cancelError) {
+            console.error("음성 스트림 취소에 실패했습니다.", cancelError);
+          }
+        }
+        try {
+          reader.releaseLock();
+        } catch (releaseError) {
+          console.error("음성 스트림 잠금 해제에 실패했습니다.", releaseError);
+        }
+      }
     }
   };
 
@@ -457,7 +516,7 @@ export default function Home() {
                   />
                   <a
                     href={audioUrl}
-                    download={`gemini_tts_${voice}.wav`}
+                    download={downloadFileName}
                     className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold hover:bg-pink-200 transition-colors"
                     aria-label="생성된 음성 파일 다운로드"
                   >

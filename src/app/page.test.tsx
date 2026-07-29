@@ -265,7 +265,17 @@ it("상태 라이브 영역을 유지하며 생성 상태 문구만 갱신한다
   );
 
   expect(liveStatus).toHaveTextContent(
-    "음성을 생성하며 재생하고 있습니다.",
+    "음성을 생성하고 있습니다. 준비되면 자동 재생됩니다.",
+  );
+
+  act(() => {
+    streamController.enqueue(Uint8Array.from([0, 0]));
+  });
+
+  await waitFor(() =>
+    expect(liveStatus).toHaveTextContent(
+      "음성을 생성하며 재생하고 있습니다.",
+    ),
   );
 });
 
@@ -694,4 +704,103 @@ it("언마운트 후 늦게 끝난 요청은 오디오 결과를 만들지 않�
   expect(player.close).toHaveBeenCalledOnce();
   expect(player.enqueue).not.toHaveBeenCalled();
   expect(createObjectUrl).not.toHaveBeenCalled();
+});
+
+it("영문 네트워크 오류를 친절한 한국어 안내로 정규화한다", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const user = userEvent.setup();
+  render(<Home />);
+
+  await user.type(
+    screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
+    "네트워크 오류를 확인할 음성",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+
+  act(() => errorStream(new TypeError("Failed to fetch")));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "음성 생성 중 연결이 끊어졌습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+  );
+  expect(screen.getByRole("alert")).not.toHaveTextContent("Failed to fetch");
+});
+
+it("생성 당시 음성과 시각을 다운로드 파일명에 고정한다", async () => {
+  const user = userEvent.setup();
+  render(<Home />);
+
+  await user.type(
+    screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
+    "파일명을 확인할 음성",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+  act(() => {
+    streamController.enqueue(Uint8Array.from([0, 0]));
+    closeStream();
+  });
+
+  const download = await screen.findByRole("link", {
+    name: "생성된 음성 파일 다운로드",
+  });
+  const originalName = download.getAttribute("download");
+  expect(originalName).toMatch(
+    /^gemini_tts_Puck_\d{6}_\d{6}\.wav$/,
+  );
+
+  await user.selectOptions(
+    screen.getByLabelText("음성 선택"),
+    "Aoede",
+  );
+  expect(download).toHaveAttribute("download", originalName);
+});
+
+it("스트림 reader를 정상 완료 후 해제하고 오류 시 취소한다", async () => {
+  const cancelReader = vi.spyOn(
+    ReadableStreamDefaultReader.prototype,
+    "cancel",
+  );
+  const releaseReader = vi.spyOn(
+    ReadableStreamDefaultReader.prototype,
+    "releaseLock",
+  );
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const user = userEvent.setup();
+  render(<Home />);
+
+  await user.type(
+    screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
+    "reader 정리 성공",
+  );
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+  act(() => {
+    streamController.enqueue(Uint8Array.from([0, 0]));
+    closeStream();
+  });
+  await screen.findByRole("link", {
+    name: "생성된 음성 파일 다운로드",
+  });
+  expect(releaseReader).toHaveBeenCalledOnce();
+  expect(cancelReader).not.toHaveBeenCalled();
+
+  let failingController!: ReadableStreamDefaultController<Uint8Array>;
+  const failingStream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      failingController = controller;
+    },
+  });
+  vi.mocked(fetch).mockResolvedValueOnce(new Response(failingStream));
+  await user.click(
+    screen.getByRole("button", { name: "음성 생성하기 버튼" }),
+  );
+  act(() => failingController.error(new Error("stream failed")));
+  await screen.findByRole("alert");
+
+  expect(cancelReader).toHaveBeenCalledOnce();
+  expect(releaseReader).toHaveBeenCalledTimes(2);
 });

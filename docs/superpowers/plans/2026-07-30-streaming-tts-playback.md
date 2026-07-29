@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js Route Handler가 `generateContentStream()`의 오디오 청크를 원시 PCM 응답으로 전달한다. 클라이언트는 Web Audio API로 각 청크를 연속 예약 재생하면서 전체 바이트를 누적하고, 스트림 완료 후 WAV Blob을 만들어 다시 듣기와 다운로드에 사용한다.
 
-**Tech Stack:** Next.js 16.2.4 App Router, React 19.2.4, TypeScript 5, `@google/genai` 1.50.1, Web Streams API, Web Audio API, Vitest, React Testing Library
+**Tech Stack:** Next.js 16.2.12 App Router, React 19.2.4, TypeScript 5, `@google/genai` 1.50.1, Web Streams API, Web Audio API, Vitest, React Testing Library
 
 ## Global Constraints
 

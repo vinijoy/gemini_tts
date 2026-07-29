@@ -181,3 +181,52 @@ it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하
   expect(gemini.generateContentStream).toHaveBeenCalledOnce();
   expect(returnCallCount).toBe(1);
 });
+
+it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", async () => {
+  let sdkSignal: AbortSignal | undefined;
+  let returnCallCount = 0;
+
+  gemini.generateContentStream.mockImplementation(async (parameters) => {
+    sdkSignal = (
+      parameters as { config?: { abortSignal?: AbortSignal } }
+    ).config?.abortSignal;
+
+    async function* streamingResponses() {
+      try {
+        yield {
+          candidates: [{
+            content: { parts: [{ inlineData: { data: "AAE=" } }] },
+          }],
+        };
+        await new Promise<void>((_resolve, reject) => {
+          if (sdkSignal?.aborted) {
+            reject(sdkSignal.reason);
+            return;
+          }
+          sdkSignal?.addEventListener(
+            "abort",
+            () => reject(sdkSignal?.reason),
+            { once: true },
+          );
+        });
+      } finally {
+        returnCallCount += 1;
+      }
+    }
+
+    return streamingResponses();
+  });
+
+  const response = await POST(createRequest());
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("응답 스트림 reader가 없습니다.");
+  await expect(reader.read()).resolves.toEqual({
+    done: false,
+    value: Uint8Array.from([0, 1]),
+  });
+
+  await reader.cancel();
+
+  expect(sdkSignal?.aborted).toBe(true);
+  expect(returnCallCount).toBe(1);
+});
