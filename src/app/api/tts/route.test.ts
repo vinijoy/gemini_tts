@@ -171,6 +171,44 @@ it("후속 원고 조각이 출력 한도로 종료되면 완성 스트림을 �
   );
 });
 
+it("일부 오디오 뒤 OTHER로 종료된 조각은 잘린 PCM을 버리고 자동 재시도한다", async () => {
+  vi.useFakeTimers();
+  gemini.generateContentStream
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "OTHER",
+              content: { parts: [{ inlineData: { data: "AAE=" } }] },
+            },
+          ],
+        };
+      })(),
+    )
+    .mockResolvedValueOnce(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: "STOP",
+              content: { parts: [{ inlineData: { data: "AgM=" } }] },
+            },
+          ],
+        };
+      })(),
+    );
+
+  const responsePromise = POST(createRequest());
+  await vi.runAllTimersAsync();
+  const response = await responsePromise;
+
+  expect(
+    Array.from(new Uint8Array(await response.arrayBuffer())),
+  ).toEqual([2, 3]);
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+});
+
 it.each([
   {
     caseName: "첫 iterator 읽기 오류",
@@ -298,7 +336,7 @@ it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하
   expect(returnCallCount).toBe(1);
 });
 
-it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", async () => {
+it("완료된 조각들로 만든 body는 안전하게 취소할 수 있다", async () => {
   let sdkSignal: AbortSignal | undefined;
   let returnCallCount = 0;
 
@@ -311,20 +349,10 @@ it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", 
       try {
         yield {
           candidates: [{
+            finishReason: "STOP",
             content: { parts: [{ inlineData: { data: "AAE=" } }] },
           }],
         };
-        await new Promise<void>((_resolve, reject) => {
-          if (sdkSignal?.aborted) {
-            reject(sdkSignal.reason);
-            return;
-          }
-          sdkSignal?.addEventListener(
-            "abort",
-            () => reject(sdkSignal?.reason),
-            { once: true },
-          );
-        });
       } finally {
         returnCallCount += 1;
       }
@@ -344,7 +372,7 @@ it("성공 응답 body를 취소하면 SDK 요청과 iterator를 정리한다", 
 
   await reader.cancel();
 
-  expect(sdkSignal?.aborted).toBe(true);
-  expect(returnCallCount).toBe(1);
-  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+  expect(sdkSignal?.aborted).toBe(false);
+  expect(returnCallCount).toBe(2);
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
 });

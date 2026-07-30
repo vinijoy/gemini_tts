@@ -52,6 +52,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - 생성 중과 완료 후 다시 듣기에 동일한 Web Audio 재생 경로와 동일 PCM을 사용하여 재생 음질 일치
 - 장문 원고는 300자 조각마다 Gemini API 요청 1회를 사용하므로 무료 티어의 일일 요청 한도에 더 빨리 도달할 수 있음
 - Gemini 429 할당량 오류는 재시도하지 않고 무료 일일 한도 또는 결제 설정을 확인할 수 있는 한국어 안내로 즉시 반환
+- 각 장문 조각은 Gemini 정상 종료를 확인한 뒤 재생하고, `OTHER` 같은 일시적 비정상 종료는 잘린 음성을 내보내지 않고 해당 조각만 자동 재시도
 
 ## 검증
 

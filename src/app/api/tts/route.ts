@@ -39,6 +39,16 @@ class TtsHttpError extends Error {
   }
 }
 
+class TtsCompletionError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = "TtsCompletionError";
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
@@ -142,6 +152,29 @@ function responseContainsAudio(response: GenerateContentResponse): boolean {
   );
 }
 
+function getCompletionError(
+  response: GenerateContentResponse,
+): TtsCompletionError | null {
+  for (const candidate of response.candidates ?? []) {
+    const finishReason = candidate.finishReason;
+    if (!finishReason || finishReason === "STOP") {
+      continue;
+    }
+    if (finishReason === "MAX_TOKENS") {
+      return new TtsCompletionError(
+        "출력 한도에 도달해 음성이 중간에 잘렸습니다. 원고를 더 작은 단위로 나누어 다시 생성해 주세요.",
+        false,
+      );
+    }
+    return new TtsCompletionError(
+      `Gemini가 음성 생성을 정상적으로 완료하지 못했습니다. (종료 사유: ${finishReason})`,
+      finishReason === "OTHER",
+    );
+  }
+
+  return null;
+}
+
 async function waitForRetry(
   delayMs: number,
   requestSignal: AbortSignal,
@@ -221,6 +254,9 @@ function createRetriedAudioSource(
         let iteratorFinished = false;
         let emittedAudio = false;
         let completedSuccessfully = false;
+        // 조각 전체의 정상 종료를 확인하기 전에는 PCM을 사용자에게 보내지 않는다.
+        // 그래야 OTHER 같은 비정상 종료 시 잘린 음성을 섞지 않고 이 조각만 재시도할 수 있다.
+        const bufferedResponses: GenerateContentResponse[] = [];
 
         try {
           if (requestSignal.aborted || streamSignal.aborted) {
@@ -259,13 +295,17 @@ function createRetriedAudioSource(
                 throw new Error("오디오 데이터가 없습니다.");
               }
               completedSuccessfully = true;
-              return;
+              break;
             }
 
             if (responseContainsAudio(result.value)) {
               emittedAudio = true;
             }
-            yield result.value;
+            const completionError = getCompletionError(result.value);
+            if (completionError) {
+              throw completionError;
+            }
+            bufferedResponses.push(result.value);
           }
         } catch (error) {
           if (requestSignal.aborted || streamSignal.aborted) {
@@ -275,7 +315,7 @@ function createRetriedAudioSource(
           if (quotaError) {
             throw quotaError;
           }
-          if (emittedAudio) {
+          if (error instanceof TtsCompletionError && !error.retryable) {
             throw error;
           }
           if (attempt >= maxRetries) {
@@ -294,6 +334,13 @@ function createRetriedAudioSource(
           if (!completedSuccessfully) {
             attemptController.abort();
           }
+        }
+
+        if (completedSuccessfully) {
+          for (const response of bufferedResponses) {
+            yield response;
+          }
+          return;
         }
 
         await waitForRetry(
