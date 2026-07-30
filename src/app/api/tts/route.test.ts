@@ -81,97 +81,46 @@ it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
   requestController.abort();
 });
 
-it("긴 원고를 문장 경계로 나누어 PCM을 요청 순서대로 결합한다", async () => {
-  const firstTranscript = `${"가".repeat(290)}.`;
-  const secondTranscript = `${"나".repeat(20)}.`;
-  gemini.generateContentStream
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: { parts: [{ inlineData: { data: "AAE=" } }] },
-            },
-          ],
-        };
-      })(),
-    )
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: { parts: [{ inlineData: { data: "AgM=" } }] },
-            },
-          ],
-        };
-      })(),
-    );
-
-  const response = await POST(
-    createRequest(undefined, `${firstTranscript} ${secondTranscript}`),
+it("1,000자 이내 원고 전체를 하나의 Gemini 요청으로 전달한다", async () => {
+  const transcript = `${"가".repeat(600)} ${"나".repeat(399)}`;
+  gemini.generateContentStream.mockResolvedValueOnce(
+    (async function* () {
+      yield {
+        candidates: [
+          {
+            finishReason: "STOP",
+            content: { parts: [{ inlineData: { data: "AAE=" } }] },
+          },
+        ],
+      };
+    })(),
   );
+
+  const response = await POST(createRequest(undefined, transcript));
 
   expect(
     Array.from(new Uint8Array(await response.arrayBuffer())),
-  ).toEqual([0, 1, 2, 3]);
-  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
-
-  const prompts = gemini.generateContentStream.mock.calls.map(
-    ([parameters]) =>
-      (
-        parameters as {
-          contents: Array<{ parts: Array<{ text: string }> }>;
-        }
-      ).contents[0].parts[0].text,
-  );
-  expect(prompts[0]).toContain(`#### TRANSCRIPT\n${firstTranscript}`);
-  expect(prompts[0]).not.toContain(secondTranscript);
-  expect(prompts[1]).toContain(`#### TRANSCRIPT\n${secondTranscript}`);
-  expect(prompts[1]).not.toContain(firstTranscript);
+  ).toEqual([0, 1]);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+  const prompt = (
+    gemini.generateContentStream.mock.calls[0][0] as {
+      contents: Array<{ parts: Array<{ text: string }> }>;
+    }
+  ).contents[0].parts[0].text;
+  expect(prompt).toContain(`#### TRANSCRIPT\n${transcript}`);
 });
 
-it("후속 원고 조각이 출력 한도로 종료되면 완성 스트림을 거부한다", async () => {
-  const firstTranscript = `${"가".repeat(290)}.`;
-  const secondTranscript = `${"나".repeat(20)}.`;
-  gemini.generateContentStream
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: { parts: [{ inlineData: { data: "AAE=" } }] },
-            },
-          ],
-        };
-      })(),
-    )
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "MAX_TOKENS",
-              content: { parts: [{ inlineData: { data: "AgM=" } }] },
-            },
-          ],
-        };
-      })(),
-    );
+it("1,000자를 초과한 원고는 Gemini 요청 전에 거부한다", async () => {
+  const response = await POST(createRequest(undefined, "가".repeat(1001)));
 
-  const response = await POST(
-    createRequest(undefined, `${firstTranscript} ${secondTranscript}`),
-  );
-
-  await expect(response.arrayBuffer()).rejects.toThrow(
-    "출력 한도에 도달해 음성이 중간에 잘렸습니다.",
-  );
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({
+    error: "텍스트는 최대 1,000자까지 입력할 수 있습니다.",
+  });
+  expect(gemini.generateContentStream).not.toHaveBeenCalled();
 });
 
-it("일부 오디오 뒤 OTHER로 종료된 조각은 잘린 PCM을 버리고 자동 재시도한다", async () => {
+it("일부 오디오 뒤 OTHER로 종료된 요청은 잘린 PCM을 버리고 자동 재시도한다", async () => {
   vi.useFakeTimers();
   gemini.generateContentStream
     .mockResolvedValueOnce(
@@ -268,7 +217,7 @@ it("429 일일 할당량 오류는 재시도하지 않고 한국어 해결 방�
   expect(response.status).toBe(429);
   await expect(response.json()).resolves.toEqual({
     error:
-      "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있으며, 장문 원고는 300자 조각마다 요청 1회를 사용합니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.",
+      "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있습니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.",
   });
   expect(gemini.generateContentStream).toHaveBeenCalledOnce();
 });
@@ -336,7 +285,7 @@ it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하
   expect(returnCallCount).toBe(1);
 });
 
-it("완료된 조각들로 만든 body는 안전하게 취소할 수 있다", async () => {
+it("완료된 단일 요청의 body는 안전하게 취소할 수 있다", async () => {
   let sdkSignal: AbortSignal | undefined;
   let returnCallCount = 0;
 
@@ -373,6 +322,6 @@ it("완료된 조각들로 만든 body는 안전하게 취소할 수 있다", as
   await reader.cancel();
 
   expect(sdkSignal?.aborted).toBe(false);
-  expect(returnCallCount).toBe(2);
-  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+  expect(returnCallCount).toBe(1);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
 });

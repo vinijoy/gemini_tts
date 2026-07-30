@@ -161,57 +161,6 @@ export function createPcmStream(
   );
 }
 
-function createSequentialResponses(
-  sources: AsyncIterable<AudioResponse>[],
-): AsyncGenerator<AudioResponse> {
-  return (async function* sequentialResponses() {
-    for (let index = 0; index < sources.length; index += 1) {
-      let emittedAudio = false;
-      let sourceByteLength = 0;
-
-      for await (const response of sources[index]) {
-        const chunks = extractAudioChunks(response);
-        if (chunks.length > 0) {
-          emittedAudio = true;
-          sourceByteLength += chunks.reduce(
-            (total, chunk) => total + chunk.byteLength,
-            0,
-          );
-        }
-        yield response;
-      }
-
-      if (!emittedAudio) {
-        throw new Error(
-          `${index + 1}번째 원고 조각에서 오디오 데이터가 생성되지 않았습니다.`,
-        );
-      }
-      if (sourceByteLength % 2 !== 0) {
-        throw new Error(
-          `${index + 1}번째 원고 조각의 PCM 데이터가 16비트 샘플 경계로 끝나지 않았습니다.`,
-        );
-      }
-    }
-  })();
-}
-
-export function createSequentialPcmStream(
-  sources: AsyncIterable<AudioResponse>[],
-  abortController?: AbortController,
-): ReadableStream<Uint8Array> {
-  return createPcmStream(createSequentialResponses(sources), abortController);
-}
-
-export function prepareSequentialPcmStream(
-  sources: AsyncIterable<AudioResponse>[],
-  abortController: AbortController,
-): Promise<ReadableStream<Uint8Array>> {
-  return preparePcmStream(
-    createSequentialResponses(sources),
-    abortController,
-  );
-}
-
 export async function preparePcmStream(
   responses: AsyncIterable<AudioResponse>,
   abortController: AbortController,

@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -88,6 +89,21 @@ afterEach(() => {
   Reflect.deleteProperty(URL, "revokeObjectURL");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it("본문 입력과 태그 추가를 1,000자에서 원천 차단한다", async () => {
+  const user = userEvent.setup();
+  render(<Home />);
+  const textInput = screen.getByLabelText(
+    "음성으로 변환할 텍스트 입력창",
+  );
+
+  expect(textInput).toHaveAttribute("maxLength", "1000");
+  fireEvent.change(textInput, { target: { value: "가".repeat(1001) } });
+  expect(textInput).toHaveValue("가".repeat(1000));
+
+  await user.click(screen.getByRole("button", { name: "웃음 태그 추가" }));
+  expect(textInput).toHaveValue("가".repeat(1000));
 });
 
 it("생성 중 첫 PCM 청크를 자동 재생하고 결과 액션을 비활성화한다", async () => {

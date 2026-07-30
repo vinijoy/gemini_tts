@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
 import fs from "fs";
 import path from "path";
-import { prepareSequentialPcmStream } from "./stream";
-import { splitTranscript } from "./transcript";
+import { preparePcmStream } from "./stream";
 
 // API 키 로드 로직 (기존 유지)
 let apiKey = process.env.GEMINI_API_KEY;
@@ -57,9 +56,11 @@ function getErrorMessage(error: unknown): string {
 
 const STREAM_START_ERROR =
   "음성 생성 스트림을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const MAX_TEXT_LENGTH = 1000;
+const TEXT_TOO_LONG_ERROR = "텍스트는 최대 1,000자까지 입력할 수 있습니다.";
 const REQUEST_ABORT_ERROR = "음성 생성 요청이 취소되었습니다.";
 const DAILY_QUOTA_ERROR =
-  "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있으며, 장문 원고는 300자 조각마다 요청 1회를 사용합니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.";
+  "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있습니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.";
 const RATE_LIMIT_ERROR =
   "Gemini API 요청이 잠시 제한되었습니다. 잠시 기다린 뒤 다시 시도해 주세요.";
 
@@ -254,8 +255,8 @@ function createRetriedAudioSource(
         let iteratorFinished = false;
         let emittedAudio = false;
         let completedSuccessfully = false;
-        // 조각 전체의 정상 종료를 확인하기 전에는 PCM을 사용자에게 보내지 않는다.
-        // 그래야 OTHER 같은 비정상 종료 시 잘린 음성을 섞지 않고 이 조각만 재시도할 수 있다.
+        // 응답 전체의 정상 종료를 확인하기 전에는 PCM을 사용자에게 보내지 않는다.
+        // 그래야 OTHER 같은 비정상 종료 시 잘린 음성을 섞지 않고 같은 요청을 재시도할 수 있다.
         const bufferedResponses: GenerateContentResponse[] = [];
 
         try {
@@ -364,6 +365,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (text.length > MAX_TEXT_LENGTH) {
+      return NextResponse.json(
+        { error: TEXT_TOO_LONG_ERROR },
+        { status: 400 },
+      );
+    }
 
     const selectedVoice = voice || "Puck";
     const streamController = new AbortController();
@@ -373,17 +380,15 @@ export async function POST(req: NextRequest) {
     } else {
       req.signal.addEventListener("abort", abortStream, { once: true });
     }
-    const sources = splitTranscript(text).map((transcript) =>
-      createRetriedAudioSource(
-        transcript,
-        selectedVoice,
-        stylePrompt,
-        req.signal,
-        streamController.signal,
-      ),
+    const source = createRetriedAudioSource(
+      text,
+      selectedVoice,
+      stylePrompt,
+      req.signal,
+      streamController.signal,
     );
-    const stream = await prepareSequentialPcmStream(
-      sources,
+    const stream = await preparePcmStream(
+      source,
       streamController,
     );
 

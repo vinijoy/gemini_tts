@@ -69,6 +69,7 @@ function createDownloadFileName(voice: string, generatedAt: Date) {
 }
 
 export default function Home() {
+  const maxTextLength = 1000;
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("Puck");
   const [stylePrompt, setStylePrompt] = useState("");
@@ -408,7 +409,10 @@ export default function Home() {
               className="w-full h-32 p-4 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none"
               placeholder="음성으로 변환할 텍스트를 입력해주세요..."
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              maxLength={maxTextLength}
+              onChange={(e) =>
+                setText(e.target.value.slice(0, maxTextLength))
+              }
               disabled={isLoading}
               aria-label="음성으로 변환할 텍스트 입력창"
             />
@@ -456,7 +460,11 @@ export default function Home() {
               ].map(tag => (
                 <button
                   key={tag.id}
-                  onClick={() => setText(prev => prev + `[${tag.id}] `)}
+                  onClick={() =>
+                    setText((previousText) =>
+                      `${previousText}[${tag.id}] `.slice(0, maxTextLength),
+                    )
+                  }
                   disabled={isLoading}
                   className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium hover:bg-pink-200 transition-colors disabled:opacity-50"
                   aria-label={`${tag.label} 태그 추가`}
