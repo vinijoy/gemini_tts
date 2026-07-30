@@ -251,6 +251,118 @@ it("429 일일 할당량 오류는 재시도하지 않고 한국어 해결 방�
   expect(gemini.generateContentStream).toHaveBeenCalledOnce();
 });
 
+it("429 분당 한도는 Google 권장 시간만큼 기다린 뒤 한 번 자동 복구한다", async () => {
+  vi.useFakeTimers();
+  const rateLimitError = Object.assign(
+    new Error(
+      '{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"2s"}]}}\nQuota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model\nquotaId: GenerateRequestsPerMinutePerProjectPerModel',
+    ),
+    { status: 429 },
+  );
+  gemini.generateContentStream
+    .mockRejectedValueOnce(rateLimitError)
+    .mockResolvedValueOnce(audioResponses());
+
+  const responsePromise = POST(createRequest());
+  await vi.advanceTimersByTimeAsync(1999);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+
+  await vi.advanceTimersByTimeAsync(1);
+  const response = await responsePromise;
+
+  expect(response.status).toBe(200);
+  expect(
+    Array.from(new Uint8Array(await response.arrayBuffer())),
+  ).toEqual([0, 1]);
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+});
+
+it("구조화된 RetryInfo가 없으면 오류 메시지의 권장 시간을 사용한다", async () => {
+  vi.useFakeTimers();
+  const rateLimitError = Object.assign(
+    new Error(
+      "Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model. Please retry in 3.5s.",
+    ),
+    { status: 429 },
+  );
+  gemini.generateContentStream
+    .mockRejectedValueOnce(rateLimitError)
+    .mockResolvedValueOnce(audioResponses());
+
+  const responsePromise = POST(createRequest());
+  await vi.advanceTimersByTimeAsync(3499);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+
+  await vi.advanceTimersByTimeAsync(1);
+  const response = await responsePromise;
+
+  expect(response.status).toBe(200);
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+});
+
+it("자동 복구 뒤에도 분당 한도면 권장 대기 시간을 안내하고 중단한다", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const rateLimitError = Object.assign(
+    new Error(
+      '{"retryDelay":"2s"}\nQuota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model',
+    ),
+    { status: 429 },
+  );
+  gemini.generateContentStream.mockRejectedValue(rateLimitError);
+
+  const responsePromise = POST(createRequest());
+  await vi.advanceTimersByTimeAsync(2000);
+  const response = await responsePromise;
+
+  expect(response.status).toBe(429);
+  await expect(response.json()).resolves.toEqual({
+    error:
+      "Gemini API 요청이 계속 제한되고 있습니다. 2초 뒤 다시 시도해 주세요.",
+  });
+  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+});
+
+it.each(["0.5s", "66s"])(
+  "분당 한도의 비정상 재시도 시간 %s는 자동 실행하지 않는다",
+  async (retryDelay) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const rateLimitError = Object.assign(
+      new Error(
+        `{"retryDelay":"${retryDelay}"}\nQuota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model`,
+      ),
+      { status: 429 },
+    );
+    gemini.generateContentStream.mockRejectedValue(rateLimitError);
+
+    const response = await POST(createRequest());
+
+    expect(response.status).toBe(429);
+    expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+  },
+);
+
+it("분당 한도 자동 대기 중 요청을 취소하면 재시도하지 않는다", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const requestController = new AbortController();
+  const rateLimitError = Object.assign(
+    new Error(
+      '{"retryDelay":"30s"}\nQuota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model',
+    ),
+    { status: 429 },
+  );
+  gemini.generateContentStream.mockRejectedValue(rateLimitError);
+
+  const responsePromise = POST(createRequest(requestController.signal));
+  await vi.advanceTimersByTimeAsync(1000);
+  requestController.abort(new DOMException("요청 취소", "AbortError"));
+  const response = await responsePromise;
+
+  expect(response.status).toBe(500);
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
+});
+
 it("첫 오디오 전에 요청을 취소하면 현재 SDK iterator만 정리하고 종료한다", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const requestController = new AbortController();

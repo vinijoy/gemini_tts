@@ -32,6 +32,7 @@ class TtsHttpError extends Error {
     readonly status: number,
     message: string,
     cause?: unknown,
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message, { cause });
     this.name = "TtsHttpError";
@@ -63,6 +64,8 @@ const DAILY_QUOTA_ERROR =
   "Gemini API 요청 할당량을 모두 사용했습니다. 무료 티어는 모델별 일일 요청 한도가 있습니다. 결제 및 할당량 설정을 확인하거나 한도가 초기화된 뒤 다시 시도해 주세요.";
 const RATE_LIMIT_ERROR =
   "Gemini API 요청이 잠시 제한되었습니다. 잠시 기다린 뒤 다시 시도해 주세요.";
+const MIN_RATE_LIMIT_RETRY_MS = 1000;
+const MAX_RATE_LIMIT_RETRY_MS = 65_000;
 
 function getExternalErrorDetails(error: unknown): string {
   const details: string[] = [];
@@ -115,10 +118,29 @@ function createQuotaError(error: unknown): TtsHttpError | null {
     /generate_content_free_tier_requests|GenerateRequestsPerDay/i.test(
       details,
     );
+  const isPerMinuteLimit =
+    /generate_requests_per_model|GenerateRequestsPerMinutePerProjectPerModel/i.test(
+      details,
+    );
+  const retryDelayMatch =
+    details.match(/"retryDelay"\s*:\s*"([0-9]+(?:\.[0-9]+)?)s"/i) ??
+    details.match(/Please retry in ([0-9]+(?:\.[0-9]+)?)s/i);
+  const parsedRetryMs = retryDelayMatch
+    ? Number.parseFloat(retryDelayMatch[1]) * 1000
+    : Number.NaN;
+  const retryAfterMs =
+    isPerMinuteLimit &&
+    Number.isFinite(parsedRetryMs) &&
+    parsedRetryMs >= MIN_RATE_LIMIT_RETRY_MS &&
+    parsedRetryMs <= MAX_RATE_LIMIT_RETRY_MS
+      ? parsedRetryMs
+      : null;
+
   return new TtsHttpError(
     429,
     isDailyFreeTierLimit ? DAILY_QUOTA_ERROR : RATE_LIMIT_ERROR,
     error,
+    retryAfterMs,
   );
 }
 
@@ -238,8 +260,10 @@ function createRetriedAudioSource(
   return {
     async *[Symbol.asyncIterator]() {
       const maxRetries = 2;
+      let retryCount = 0;
+      let rateLimitRetryCount = 0;
 
-      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      while (true) {
         const attemptController = new AbortController();
         const unlinkRequestAbort = linkRequestAbort(
           requestSignal,
@@ -255,6 +279,7 @@ function createRetriedAudioSource(
         let iteratorFinished = false;
         let emittedAudio = false;
         let completedSuccessfully = false;
+        let retryDelayMs: number | null = null;
 
         try {
           if (requestSignal.aborted || streamSignal.aborted) {
@@ -313,16 +338,41 @@ function createRetriedAudioSource(
           }
           const quotaError = createQuotaError(error);
           if (quotaError) {
-            throw quotaError;
-          }
-          if (emittedAudio) {
+            if (
+              !emittedAudio &&
+              quotaError.retryAfterMs !== null &&
+              rateLimitRetryCount === 0
+            ) {
+              rateLimitRetryCount += 1;
+              retryDelayMs = quotaError.retryAfterMs;
+            } else {
+              if (
+                rateLimitRetryCount > 0 &&
+                quotaError.retryAfterMs !== null
+              ) {
+                const retryAfterSeconds = Math.ceil(
+                  quotaError.retryAfterMs / 1000,
+                );
+                throw new TtsHttpError(
+                  429,
+                  `Gemini API 요청이 계속 제한되고 있습니다. ${retryAfterSeconds}초 뒤 다시 시도해 주세요.`,
+                  quotaError,
+                );
+              }
+              throw quotaError;
+            }
+          } else if (emittedAudio) {
             throw error;
-          }
-          if (error instanceof TtsCompletionError && !error.retryable) {
+          } else if (
+            error instanceof TtsCompletionError &&
+            !error.retryable
+          ) {
             throw error;
-          }
-          if (attempt >= maxRetries) {
+          } else if (retryCount >= maxRetries) {
             throw new Error(STREAM_START_ERROR, { cause: error });
+          } else {
+            retryCount += 1;
+            retryDelayMs = 1000 * retryCount;
           }
         } finally {
           unlinkRequestAbort();
@@ -339,11 +389,9 @@ function createRetriedAudioSource(
           }
         }
 
-        await waitForRetry(
-          1000 * (attempt + 1),
-          requestSignal,
-          streamSignal,
-        );
+        if (retryDelayMs !== null) {
+          await waitForRetry(retryDelayMs, requestSignal, streamSignal);
+        }
       }
     },
   };
