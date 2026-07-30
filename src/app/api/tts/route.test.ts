@@ -81,6 +81,46 @@ it("S16LE PCM 스트림 계약 헤더와 본문을 반환한다", async () => {
   requestController.abort();
 });
 
+it("Gemini 완료를 기다리지 않고 첫 PCM이 도착하면 HTTP 응답을 시작한다", async () => {
+  const requestController = new AbortController();
+  let releaseStream!: () => void;
+  const streamPending = new Promise<void>((resolve) => {
+    releaseStream = resolve;
+  });
+  gemini.generateContentStream.mockResolvedValueOnce(
+    (async function* () {
+      yield {
+        candidates: [
+          { content: { parts: [{ inlineData: { data: "AAE=" } }] } },
+        ],
+      };
+      await streamPending;
+    })(),
+  );
+
+  const responsePromise = POST(createRequest(requestController.signal));
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const outcome = await Promise.race([
+    responsePromise.then((response) => ({ response })),
+    new Promise<{ timeout: true }>((resolve) => {
+      timeout = setTimeout(() => resolve({ timeout: true }), 100);
+    }),
+  ]);
+  if (timeout) clearTimeout(timeout);
+
+  expect(outcome).not.toEqual({ timeout: true });
+  if ("response" in outcome) {
+    const reader = outcome.response.body?.getReader();
+    await expect(reader?.read()).resolves.toEqual({
+      done: false,
+      value: Uint8Array.from([0, 1]),
+    });
+    releaseStream();
+    await reader?.cancel();
+  }
+  requestController.abort();
+});
+
 it("1,000자 이내 원고 전체를 하나의 Gemini 요청으로 전달한다", async () => {
   const transcript = `${"가".repeat(600)} ${"나".repeat(399)}`;
   gemini.generateContentStream.mockResolvedValueOnce(
@@ -120,42 +160,31 @@ it("1,000자를 초과한 원고는 Gemini 요청 전에 거부한다", async ()
   expect(gemini.generateContentStream).not.toHaveBeenCalled();
 });
 
-it("일부 오디오 뒤 OTHER로 종료된 요청은 잘린 PCM을 버리고 자동 재시도한다", async () => {
-  vi.useFakeTimers();
-  gemini.generateContentStream
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "OTHER",
-              content: { parts: [{ inlineData: { data: "AAE=" } }] },
-            },
-          ],
-        };
-      })(),
-    )
-    .mockResolvedValueOnce(
-      (async function* () {
-        yield {
-          candidates: [
-            {
-              finishReason: "STOP",
-              content: { parts: [{ inlineData: { data: "AgM=" } }] },
-            },
-          ],
-        };
-      })(),
-    );
+it("오디오 전송 시작 뒤 OTHER가 발생하면 재시도 없이 스트림을 종료한다", async () => {
+  gemini.generateContentStream.mockResolvedValueOnce(
+    (async function* () {
+      yield {
+        candidates: [
+          { content: { parts: [{ inlineData: { data: "AAE=" } }] } },
+        ],
+      };
+      yield {
+        candidates: [
+          {
+            finishReason: "OTHER",
+            content: { parts: [{ inlineData: { data: "AgM=" } }] },
+          },
+        ],
+      };
+    })(),
+  );
 
-  const responsePromise = POST(createRequest());
-  await vi.runAllTimersAsync();
-  const response = await responsePromise;
+  const response = await POST(createRequest());
 
-  expect(
-    Array.from(new Uint8Array(await response.arrayBuffer())),
-  ).toEqual([2, 3]);
-  expect(gemini.generateContentStream).toHaveBeenCalledTimes(2);
+  await expect(response.arrayBuffer()).rejects.toThrow(
+    "Gemini가 음성 생성을 정상적으로 완료하지 못했습니다. (종료 사유: OTHER)",
+  );
+  expect(gemini.generateContentStream).toHaveBeenCalledOnce();
 });
 
 it.each([

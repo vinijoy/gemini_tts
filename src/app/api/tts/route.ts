@@ -255,9 +255,6 @@ function createRetriedAudioSource(
         let iteratorFinished = false;
         let emittedAudio = false;
         let completedSuccessfully = false;
-        // 응답 전체의 정상 종료를 확인하기 전에는 PCM을 사용자에게 보내지 않는다.
-        // 그래야 OTHER 같은 비정상 종료 시 잘린 음성을 섞지 않고 같은 요청을 재시도할 수 있다.
-        const bufferedResponses: GenerateContentResponse[] = [];
 
         try {
           if (requestSignal.aborted || streamSignal.aborted) {
@@ -296,17 +293,19 @@ function createRetriedAudioSource(
                 throw new Error("오디오 데이터가 없습니다.");
               }
               completedSuccessfully = true;
-              break;
+              return;
             }
 
             if (responseContainsAudio(result.value)) {
               emittedAudio = true;
             }
             const completionError = getCompletionError(result.value);
+            // 단일 Gemini 요청의 PCM은 도착 즉시 브라우저로 전달한다.
+            // 종료 사유는 해당 응답을 전송한 다음 검사해 이미 받은 음성을 지연시키지 않는다.
+            yield result.value;
             if (completionError) {
               throw completionError;
             }
-            bufferedResponses.push(result.value);
           }
         } catch (error) {
           if (requestSignal.aborted || streamSignal.aborted) {
@@ -315,6 +314,9 @@ function createRetriedAudioSource(
           const quotaError = createQuotaError(error);
           if (quotaError) {
             throw quotaError;
+          }
+          if (emittedAudio) {
+            throw error;
           }
           if (error instanceof TtsCompletionError && !error.retryable) {
             throw error;
@@ -335,13 +337,6 @@ function createRetriedAudioSource(
           if (!completedSuccessfully) {
             attemptController.abort();
           }
-        }
-
-        if (completedSuccessfully) {
-          for (const response of bufferedResponses) {
-            yield response;
-          }
-          return;
         }
 
         await waitForRetry(
