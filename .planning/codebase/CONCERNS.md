@@ -1,80 +1,94 @@
 # Codebase Concerns
 
 **Analysis Date:** 2026-10-11
-**Last mapped commit:** `b373c48b74146f4a2308aff429693e284989e7b1`
+**Last mapped commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
 ## Tech Debt
 
 **서버 비밀 설정 로딩이 애플리케이션 코드에 포함됨:**
 - Issue: 런타임에 `.env.local`을 직접 읽고 정규식으로 키를 파싱한다. 환경 파일 형식과 배포 환경에 취약하다.
-- Files: `src/app/api/tts/route.ts`
-- Impact: 잘못 읽힌 키가 SDK 초기화로 전달되거나 설정 오류가 요청 시점의 500 오류로 나타날 수 있다.
+- Files: `src/lib/gemini-client.ts`, `scripts/generate-voice-catalog.mjs`
+- Impact: 파일 값이 환경 변수보다 우선하며 배포 설정과 실행 중 키 선택이 달라질 수 있다. 키 누락은 요청 시점의 503으로 반환한다.
 - Fix approach: 런타임 환경 변수만 사용하고 시작 시 필수 키 존재를 명시적으로 검증한다.
 
 **대형 클라이언트 컴포넌트:**
-- Issue: 입력 UI, 네트워크 스트리밍, PCM 조립, 재생 수명 주기, 다운로드 상태가 559줄 파일에 함께 있다.
+- Issue: 기능별 UI는 분리되어 있으나 `src/app/page.tsx`에 네트워크 스트리밍, PCM 조립, 재생 수명 주기, 다운로드 상태가 함께 있다.
 - Files: `src/app/page.tsx`
 - Impact: 재생·취소 상태 변경의 회귀 범위가 UI 변경과 함께 커진다.
 - Fix approach: 스트리밍 요청 훅과 입력·결과 UI를 분리하고 `src/utils/streaming-player.ts` 경계를 유지한다.
 
 ## Known Bugs
 
-**직접 API 호출에서 공백 원고와 임의 음성이 허용됨:**
-- Symptoms: `POST /api/tts`는 `text` 존재·길이만 확인하고 `voice`를 허용 목록과 비교하지 않는다.
-- Files: `src/app/api/tts/route.ts`, `src/app/page.tsx`
-- Trigger: 공백 `text` 또는 임의 `voice`를 JSON으로 POST한다.
-- Workaround: 서버에서 `text.trim()`을 검사하고 음성 이름을 허용 목록으로 제한한다.
+공백 원고·임의 기본 음성은 `src/lib/tts-contract.ts`의 trim·허용 목록 검증으로 차단한다. `src/app/api/tts/route.test.ts`에 malformed contract 거부 테스트가 있다. 미확인 실서비스 동작을 확인된 버그로 분류하지 않는다.
 
 ## Security Considerations
 
-**요청 크기 및 스타일 프롬프트 검증 공백:**
-- Risk: `stylePrompt` 길이·타입 검증이 없고 요청 JSON을 타입 단언한다. 큰 입력이 외부 모델 비용과 지연을 키울 수 있다.
-- Files: `src/app/api/tts/route.ts`
-- Current mitigation: `text`에만 1,000자 제한이 있다.
-- Recommendations: 런타임 스키마 검증, 스타일·본문 크기 제한, 인증 또는 레이트 리밋을 추가한다.
+**공유 프로젝트 자산 접근 경계:**
+- Risk: 사용자 인증·사용자별 권한·rate limit 없이 서버 키의 Voices 및 Batch 목록/관리 기능을 호출할 수 있다.
+- Files: `src/lib/gemini-client.ts`, `src/app/api/voices/[id]/route.ts`, `src/app/api/batches/[id]/route.ts`
+- Current mitigation: 변경 요청 Origin/Sec-Fetch-Site 검사, ID/경로 검증, redirect 차단, JSON 크기 제한, 정제 오류 응답이 있다. 음성 업로드·생성 동의와 UI 삭제 확인도 적용한다.
+- Recommendations: 공개 운영 범위에 맞는 인증·자산 권한·요청 한도를 추가한다. Origin 검사만으로 사용자별 권한이 생기는 것으로 해석하지 않는다.
 
 ## Performance Bottlenecks
 
-**스트림 시작 전 재시도 대기 및 무제한 외부 호출 대기:**
-- Problem: 일반 실패 재시도와 429 대기는 있지만 전체 요청 deadline이 없다.
-- Files: `src/app/api/tts/route.ts`
-- Cause: `waitForRetry`는 최대 65초까지 대기하고 외부 iterator 진행에도 별도 timeout이 없다.
-- Improvement path: 요청별 총 deadline과 시도별 timeout을 두고 초과 시 abort한다.
+**순차 대화·재시도의 총 소요 시간:**
+- Problem: custom 대화의 여러 턴과 재시도는 개별 요청 시간 제한보다 전체 소요 시간이 길어질 수 있다.
+- Files: `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`
+- Cause: 일반 upstream 요청은 120초 timeout을 적용하고 분당 429는 1~65초 대기한다. 전체 대화 총 시간 제한은 별도다.
+- Improvement path: 실제 응답 시간을 측정한 뒤 전체 요청 deadline과 진행 안내를 검토한다.
 
 ## Fragile Areas
 
 **PCM 스트림과 브라우저 재생 수명 주기:**
-- Files: `src/app/api/tts/stream.ts`, `src/app/page.tsx`, `src/utils/streaming-player.ts`
+- Files: `src/lib/gemini-tts.ts`, `src/utils/audio-format.ts`, `src/app/page.tsx`, `src/utils/streaming-player.ts`
 - Why fragile: 서버 스트림의 종료 오류와 클라이언트 reader·AbortController·AudioContext 정리가 여러 경로에 분산되어 있다.
-- Safe modification: Route Handler 스트리밍 계약(PCM S16LE, 24kHz, 모노)과 취소 순서를 먼저 고정하고 계약 테스트를 함께 갱신한다.
+- Safe modification: Route Handler 스트리밍 계약(PCM16LE, 8/16/24kHz, 모노)과 취소 순서를 먼저 고정하고 계약 테스트를 함께 갱신한다.
 - Test coverage: 단위·컴포넌트 테스트는 있으나 실제 브라우저 네트워크 중단과 AudioContext를 함께 검증하는 E2E 테스트는 발견되지 않는다.
 
 ## Scaling Limits
 
 **메모리 내 완성 오디오 보관:**
-- Current capacity: 전체 PCM을 `completedPcmRef`에 보관하고 WAV Blob URL을 유지한다.
+- Files: `src/app/page.tsx`, `src/utils/audio-format.ts`, `src/lib/gemini-batches.ts`
+- Current capacity: 오디오 32MiB, Batch 확장 후 20개·입력 1MiB. 전체 PCM을 `completedPcmRef`와 WAV Blob URL에 보관하며 Batch 결과는 Base64 JSON도 함께 생성한다.
 - Limit: 여러 결과를 반복 생성할 때 브라우저 메모리 부담이 커질 수 있다.
 - Scaling path: 새 결과·언마운트 시 PCM 버퍼와 Blob URL 해제를 단일 수명 주기 함수로 통합한다.
 
 ## Dependencies at Risk
 
-**Gemini TTS 프리뷰 모델 의존:**
-- Risk: `gemini-3.1-flash-tts-preview`가 코드에 직접 고정되어 모델 종료·변경 시 생성이 중단될 수 있다.
-- Files: `src/app/api/tts/route.ts`
-- Impact: 모델 교체가 배포 없이 불가능하고 일반 오류로만 노출된다.
-- Migration plan: 모델명을 설정으로 분리하고 지원 모델별 계약 테스트와 fallback 정책을 둔다.
+**Gemini 3.8 REST 계약과 계정 기능 접근:**
+- Risk: 두 모델·Voices·Batch REST의 응답 형식과 계정 권한에 의존한다. mock 계약 테스트가 실서비스 접근 가능성을 보증하지 않는다.
+- Files: `src/lib/tts-contract.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `package.json`
+- Impact: 모델/기능 미지원 또는 provider 변경은 해당 기능 실패로 나타난다. 고정 SDK 2.28.0 설치만으로 REST 호환성이 검증되지는 않는다.
+- Migration plan: 모델 허용 목록·wire serializer·응답 parser와 계약 테스트를 함께 유지하고 실제 계정 GET/유료 실행 증거를 구분한다.
+
+**제공 카탈로그와 현재 계정의 접근 권한:**
+- Risk: 사용자 제공 `GEMINI-TTS-VOICES.md`의 2026-10-01 목록과 현재 키의 API 접근·합성 권한은 별개다.
+- Files: `src/lib/voice-catalog.ts`, `src/lib/gemini-voices.ts`, `src/app/components/VoiceLibrary.tsx`
+- Current mitigation: `source=provided`는 로컬 읽기 전용 검색이며 UI가 출처를 구분한다. 부모 실행에서 현재 키 GET은 HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`로 보고되었다. 제공 목록을 서비스 성공 증거로 사용하지 않는다.
 
 ## Missing Critical Features
 
 **운영 관측 및 사용자별 남용 방지:**
 - Problem: `/api/tts`에 인증, 사용자별 rate limit, 요청 ID 기반 구조화 로그가 없다.
+- Files: `src/lib/gemini-client.ts`, `src/app/api/tts/route.ts`
 - Blocks: 공개 배포 시 비용 폭증과 남용 원인을 사용자 단위로 추적하기 어렵다.
+
+**Remix 및 webhook:**
+- Problem: Voice Remix는 base_voice 요청 계약 미확인으로 차단되며 webhook 수신 경로는 없다. Batch는 30초 폴링이다.
+- Files: `src/app/components/VoiceStudio.tsx`, `src/app/components/BatchPanel.tsx`, `src/app/api/batches/`
+- Blocks: Remix 실행 및 서버가 완료 알림을 수신하는 흐름.
+
+**v1·외부 Batch 키의 완전성 기준:**
+- Problem: `tts-v1`에는 전체 그룹 수가 없어 입력 metadata도 없는 파일 결과에서 그룹 전체 누락을 대조할 수 없다. 외부 키는 앱 요청 정보가 없는 실패 항목으로 반환한다.
+- Files: `src/lib/gemini-batches.ts`, `src/lib/gemini-batches.test.ts`
+- Current mitigation: 앱 생성 `tts-v2-{전체그룹수}-{group}-{order}-{발화수}-{rate}-{encoding}` 키는 입력 manifest 없이도 전체 그룹 누락을 탐지한다. 빈 결과 배열을 거부하고, 알려진 그룹의 턴 누락·실패는 완성본 생성을 막는다. `tts-v1` 파싱은 호환 목적으로 유지한다.
+- Blocks: 전체 그룹 수가 없는 v1·외부 키의 원래 요청 대비 완전성 보증.
 
 ## Test Coverage Gaps
 
 **실제 런타임 경계 검증:**
-- What's not tested: Next.js 런타임의 환경 변수 누락·본문 타입 오류, 외부 네트워크 timeout, 브라우저 스트림 중단과 AudioContext 상호작용.
-- Files: `src/app/api/tts/route.ts`, `src/app/page.tsx`, `vitest.config.ts`
+- What's not tested: 실계정 유료 합성·설계·복제·Batch, 외부 네트워크 timeout, 실제 브라우저 스트림 중단·AudioContext·VoiceOver/NVDA 상호작용.
+- Files: `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `src/app/page.tsx`, `vitest.config.ts`
 - Risk: 모킹된 Gemini와 jsdom이 배포 런타임 차이를 놓칠 수 있다.
 - Priority: Medium
 

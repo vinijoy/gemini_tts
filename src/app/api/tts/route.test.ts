@@ -1,3 +1,6 @@
+import { beforeEach as prepareTestKey } from "vitest";
+it("retries OTHER before output and accepts a metadata-only final event",async()=>{const f=vi.fn().mockResolvedValueOnce(new Response(event("OTHER"))).mockResolvedValueOnce(new Response(event("STOP")+'data: {"usageMetadata":{}}\n\n'));vi.stubGlobal("fetch",f);const r=await POST(req());expect(r.status).toBe(200);expect((await r.arrayBuffer()).byteLength).toBe(2);expect(f).toHaveBeenCalledTimes(2);});
+prepareTestKey(()=>vi.stubEnv("GEMINI_API_KEY","test-key-not-a-secret"));
 import { afterEach, expect, it, vi } from "vitest";
 import { POST } from "./route";
 import { defaultRequest } from "../../components/TtsEditor";

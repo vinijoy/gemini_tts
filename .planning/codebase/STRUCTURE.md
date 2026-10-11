@@ -1,14 +1,16 @@
 # 코드베이스 구조
 
 **분석일:** 2026-10-11  
-**last_mapped_commit:** `b373c48b74146f4a2308aff429693e284989e7b1`
+**last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
 ## 디렉터리 배치
 
 ```text
 gemini_tts/
 ├── src/app/                 # App Router 페이지·레이아웃·스타일
-│   └── api/                 # Route Handler (`health`, `tts`)
+│   └── api/                 # Route Handler (`health`, `tts`, `voices`, `batches`)
+├── src/lib/                 # Gemini REST·공유 입력 계약·카탈로그 정규화
+├── scripts/                 # 공개 목소리 카탈로그 수집기
 ├── src/utils/               # PCM/WAV 변환·Web Audio 재생
 ├── public/                  # 정적 자산
 ├── docs/                    # Next.js 문서·설계·Graphify 산출물
@@ -22,11 +24,21 @@ gemini_tts/
 
 **`src/app/`:** App Router 코드. 핵심은 `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css`다.
 
-**`src/app/api/tts/`:** `route.ts`가 HTTP·Gemini·재시도를, `stream.ts`가 Base64 오디오와 Web Stream을 담당한다.
+**`src/app/api/tts/`:** `route.ts`는 검증·REST 합성 모듈을 호출하는 얇은 HTTP 어댑터다. `stream.ts`와 해당 테스트는 남아 있으나 현재 `route.ts`의 REST 실행 경로는 `src/lib/gemini-tts.ts`다.
+
+**`src/lib/`:** `tts-contract.ts`에 공유 타입·런타임 검증, `gemini-client.ts`에 인증·요청/응답 제한·Files 업로드, `gemini-tts.ts`에 REST SSE 합성, `gemini-voices.ts`에 Voices CRUD, `gemini-batches.ts`에 Batch 수명 주기와 결과 조립, `voice-catalog.ts`에 기본 30개·응답 정규화·제공 Markdown 파서를 둔다.
+
+**`src/app/components/`:** `TtsEditor.tsx`는 모델·화자·발화·출력·처리 등급 편집, `VoiceLibrary.tsx`는 기본/확장 음성 선택, `VoiceStudio.tsx`는 설계·복제·조회·삭제, `BatchPanel.tsx`는 제출·목록·상태·결과 UI다.
+
+**`src/app/api/voices/`, `src/app/api/batches/`:** 컬렉션 및 `[id]/route.ts`에 CRUD·관리 요청을, `src/app/api/batches/[id]/results/route.ts`에 결과 회수를 둔다.
+
+**`GEMINI-TTS-VOICES.md`:** 사용자 제공 2026-10-01 공개 목록 원문. `src/lib/gemini-voices.ts`의 `source=provided` 검색이 읽는다. 현재 프로젝트 키의 실서비스 검증 증거로 쓰지 않는다.
+
+**`scripts/`:** `scripts/generate-voice-catalog.mjs`가 공개 prebuilt 항목만 수집해 루트 `GEMINI-TTS-VOICES.generated.md`를 생성하여 사용자 제공 원문을 보존한다.
 
 **`src/app/api/health/`:** `src/app/api/health/route.ts`의 상태 확인 API다.
 
-**`src/utils/`:** `src/utils/pcm-audio.ts`의 PCM/WAV 형식과 `src/utils/streaming-player.ts`의 Web Audio 재생을 둔다. `src/utils/audio.ts`에는 호환 Base64-to-WAV 유틸리티가 있다.
+**`src/utils/`:** `src/utils/pcm-audio.ts`의 PCM/WAV 형식과 `src/utils/streaming-player.ts`의 Web Audio 재생을 둔다. `src/utils/audio.ts`에는 호환 Base64-to-WAV 유틸리티가 있다. `src/utils/audio-format.ts`는 WAV 구조 검증, G.711 변환, 출력 인코딩, 32MiB 제한을 담당한다.
 
 **`docs/`:** `docs/nextjs/` 프레임워크 문서, `docs/superpowers/` 설계·계획, `docs/graphify-out/` 그래프 산출물이다.
 
@@ -36,7 +48,7 @@ gemini_tts/
 
 **설정:** `package.json`, `next.config.ts`, `tsconfig.json`, `vitest.config.ts`, `eslint.config.mjs`.
 
-**핵심 로직:** `src/app/api/tts/route.ts`, `src/app/api/tts/stream.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`.
+**핵심 로직:** `src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`.
 
 **테스트:** `src/app/page.test.tsx`, `src/app/api/tts/route.test.ts`, `src/app/api/tts/stream.test.ts`, `src/app/api/health/route.test.ts`, `src/utils/pcm-audio.test.ts`, `src/utils/streaming-player.test.ts`.
 
@@ -46,17 +58,17 @@ Next.js 특수 파일은 `page.tsx`, `layout.tsx`, `route.ts`다. 일반 파일�
 
 ## 새 코드 추가 위치
 
-- 새 화면 기능: `src/app/page.tsx`, 테스트는 `src/app/page.test.tsx`.
+- 새 화면 기능: 기능별 `src/app/components/`에 두고 `src/app/page.tsx`에서 연결한다. 화면 테스트는 `src/app/page.test.tsx`.
 - 새 API: `src/app/api/<name>/route.ts`, 테스트는 같은 디렉터리.
-- 새 오디오 모듈: `src/utils/`, PCM 계약(24kHz mono 16-bit)을 유지하고 co-located 테스트를 추가한다.
-- 공유 타입·헬퍼 전용 `types/`·`lib/`는 검출되지 않았다. 두 계층 이상에서 공유될 때만 만든다.
+- 새 오디오 모듈: `src/utils/`, PCM 계약(8/16/24kHz mono 16-bit)을 유지하고 co-located 테스트를 추가한다.
+- 새 Gemini 기능: `src/lib/`에 REST 처리와 같은 위치의 `*.test.ts`를 두고, Route Handler는 입력/응답 경계로 유지한다. 공유 입력은 `src/lib/tts-contract.ts`를 재사용한다.
 
 ## 특수 디렉터리
 
 **`node_modules/`:** npm 의존성, 생성됨: 예, 커밋: 아니오.  
 **`.next/`:** Next 빌드 산출물, 생성됨: 예, 커밋: 아니오.  
 **`docs/graphify-out/`:** Graphify 분석 산출물, 생성됨: 예.  
-**`.planning/codebase/`:** GSD 지도 문서. 이번 작업에서는 `ARCHITECTURE.md`, `STRUCTURE.md`만 소유한다.
+**`.planning/codebase/`:** GSD 지도 문서. 문서별 부분 갱신 기준과 미커밋 소스 해시는 `.planning/codebase-refresh.md`에서 관리한다.
 
 ---
 

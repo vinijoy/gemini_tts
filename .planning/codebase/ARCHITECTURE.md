@@ -1,22 +1,24 @@
 # 아키텍처
 
 **분석일:** 2026-10-11  
-**last_mapped_commit:** `b373c48b74146f4a2308aff429693e284989e7b1`
+**last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
 ## 시스템 개요
 
 ```text
-브라우저 UI (`src/app/page.tsx`)
-        │ POST /api/tts
+브라우저 (`src/app/page.tsx`, `src/app/components/`)
+        │ /api/tts · /api/voices · /api/batches
         ▼
-Next.js Route Handler (`src/app/api/tts/route.ts`)
-        │ GoogleGenAI.generateContentStream()
+얇은 Route Handler (`src/app/api/`)
+        │ 공유 검증 (`src/lib/tts-contract.ts`)
         ▼
-Gemini 3.1 Flash TTS → PCM 응답 스트림
-        │ `src/app/api/tts/stream.ts` 검증·변환
+Gemini 도메인 (`src/lib/gemini-tts.ts`, `gemini-voices.ts`, `gemini-batches.ts`)
+        │ 공통 REST/Files (`src/lib/gemini-client.ts`)
         ▼
-브라우저 ReadableStream → `PcmChunkAssembler` → `StreamingPcmPlayer`
-                                   └→ 누적 PCM → WAV Blob 다운로드/재생
+Gemini 3.8 REST v1beta → SSE / Voices / Batch / JSONL Files
+        │ PCM 정규화 (`src/utils/audio-format.ts`)
+        ▼
+브라우저 청크 조립 → Web Audio → WAV 재생 / 선택 형식 다운로드
 ```
 
 ## 컴포넌트 책임
@@ -24,8 +26,14 @@ Gemini 3.1 Flash TTS → PCM 응답 스트림
 | 컴포넌트 | 책임 | 파일 |
 |---|---|---|
 | TTS 화면 | 입력, 요청 생명주기, 스트림 소비, 상태·오류 표시 | `src/app/page.tsx` |
-| TTS API | 요청 검증, 프롬프트·음성, 재시도·취소, HTTP 응답 | `src/app/api/tts/route.ts` |
-| PCM 스트림 어댑터 | Gemini inline Base64 추출과 오디오 검증 | `src/app/api/tts/stream.ts` |
+| TTS API | 공유 계약 검증과 PCM HTTP 응답 | `src/app/api/tts/route.ts` |
+| 요청 계약 | 모델·화자·발화·출력·등급 검증 | `src/lib/tts-contract.ts` |
+| REST 경계 | 키 로딩, 크기 제한, 정제 오류, Origin 검사, Files 업로드 | `src/lib/gemini-client.ts` |
+| 합성 | 요청 직렬화, SSE, 순차 custom 대화, 취소·제한 재시도 | `src/lib/gemini-tts.ts` |
+| Voices/Batch | 음성 CRUD, 작업 수명 주기·결과 조립 | `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts` |
+| 기능 UI | 편집·목소리 목록/제작·Batch 관리 | `src/app/components/TtsEditor.tsx`, `src/app/components/VoiceLibrary.tsx`, `src/app/components/VoiceStudio.tsx`, `src/app/components/BatchPanel.tsx` |
+| 오디오 형식 | WAV 검증, G.711, PCM 정규화·다운로드 인코딩 | `src/utils/audio-format.ts` |
+| 호환 PCM 어댑터 | 기존 스트림 유틸리티와 테스트; 현재 REST 라우트의 실행 경로에서는 미사용 | `src/app/api/tts/stream.ts` |
 | PCM 변환 | 청크 조립, PCM16 변환, WAV 생성 | `src/utils/pcm-audio.ts` |
 | 스트리밍 재생기 | Web Audio 활성화, 타임라인 예약, 정리 직렬화 | `src/utils/streaming-player.ts` |
 | 상태 엔드포인트 | 서비스 상태 응답 | `src/app/api/health/route.ts` |
@@ -34,29 +42,37 @@ Gemini 3.1 Flash TTS → PCM 응답 스트림
 
 **전체:** Next.js App Router 서버 Route Handler와 클라이언트 단일 페이지를 결합한 스트리밍 파이프라인.
 
-- Gemini SDK와 API 키는 서버에만 둔다.
+- Gemini REST 호출과 API 키는 서버에만 둔다.
 - 첫 PCM 청크부터 전달하고 클라이언트가 16비트 샘플 경계를 복원한다.
 - 오디오 전송 전 오류만 제한적으로 재시도하며 AbortSignal을 각 시도에 연결한다.
-- 완료 PCM은 WAV 다운로드와 다시 듣기에 재사용한다.
+- 완료 PCM은 WAV 다시 듣기와 요청한 형식 다운로드에 재사용한다.
 
 ## 계층
 
-**프레젠테이션:** `src/app/page.tsx`, `src/app/layout.tsx`가 입력·상태·접근성 UI를 소유하고 `src/utils/`와 `/api/tts`를 사용한다.
+**프레젠테이션:** `src/app/page.tsx`, `src/app/components/`가 편집·합성·Voices·Batch UI를 소유한다. `src/app/layout.tsx`는 전역 레이아웃이다.
 
-**API:** `src/app/api/tts/route.ts`, `src/app/api/tts/stream.ts`가 요청 검증, Gemini 호출, Web Stream 변환을 담당한다.
+**API:** `src/app/api/`는 HTTP 어댑터이며 공통 요청 검증·오류 처리와 `src/lib/` 도메인을 호출한다. 외부 응답·ID·경로를 신뢰하지 않고 각 경계에서 검사한다.
 
-**오디오:** `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`가 PCM/WAV/Web Audio 형식 경계를 담당한다.
+**도메인:** `src/lib/tts-contract.ts`는 브라우저/서버가 공유한다. `src/lib/gemini-client.ts`와 `gemini-{tts,voices,batches}.ts`는 서버 전송을 담당하며 클라이언트에 키를 전달하지 않는다.
+
+**오디오:** `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`가 PCM/WAV/G.711/Web Audio 형식 경계를 담당한다.
 
 ## 데이터 흐름
 
 ### 기본 TTS 요청
 
-1. `src/app/page.tsx`의 `handleGenerate`가 입력을 확인하고 재생기를 활성화한다.
-2. `POST /api/tts`가 `src/app/api/tts/route.ts`에서 최대 1,000자를 검증하고 Gemini TTS 스트림을 연다.
-3. `createRetriedAudioSource`가 429 대기·재시도·취소를 처리하고 `preparePcmStream`이 첫 유효 청크를 확인한다.
-4. `src/app/api/tts/stream.ts`가 inline Base64를 PCM S16LE 스트림으로 변환한다.
-5. 클라이언트가 `PcmChunkAssembler`와 `StreamingPcmPlayer.enqueue`로 24kHz mono 오디오를 즉시 재생한다.
-6. 종료 시 `createWavBlob`으로 Object URL을 만들어 완료·다운로드를 활성화한다.
+1. `src/app/page.tsx`가 `parseTts`로 요청 snapshot을 검증하고 재생기를 활성화한다.
+2. `src/app/api/tts/route.ts`가 `readJson`·`parseTts`를 실행하고 `openPcm`을 호출한다.
+3. `src/lib/gemini-tts.ts`가 prebuilt 대화를 단일 다중 화자 요청으로, custom 대화를 턴별 순차 요청으로 변환한다.
+4. SSE를 읽어 종료 사유·Base64·MIME·rate를 검사한다. WAV는 전체 컨테이너 검증 후, L16/G.711은 청크별 PCM으로 전달한다.
+5. `src/app/page.tsx`는 청크 경계를 조립하고 요청 샘플레이트(8/16/24kHz)로 재생한다. 완료 PCM에서 WAV와 선택 형식 다운로드를 만든다.
+
+### Voices와 Batch
+
+1. `src/app/components/VoiceLibrary.tsx`는 기본 30개, 로컬 사용자 제공 목록(`source=provided`), 현재 API 카탈로그를 구분하고 `VoiceStudio.tsx`는 설계·복제·조회·삭제를 호출한다.
+2. `src/lib/gemini-voices.ts`는 필터·동의 확인·WAV 크기/길이를 검증한 후 upstream을 호출한다. 비저장 복제 키는 화면 메모리에서만 사용한다.
+3. `src/app/components/BatchPanel.tsx`가 검증된 요청 snapshot을 모아 inline 또는 생성 JSONL Files 방식으로 제출하고 종료 전 30초마다 상태를 조회한다.
+4. `src/lib/gemini-batches.ts`는 `tts-v2` key의 전체 그룹 수·그룹·순서·발화수·rate·encoding을 대조하여 manifest 없는 파일 결과에서도 그룹 전체 누락을 표시하고, 모든 턴이 성공한 그룹만 완성 WAV로 합친다. 작업 성공과 개별 항목 성공을 구분한다.
 
 ### 다시 듣기
 
@@ -68,8 +84,10 @@ Gemini 3.1 Flash TTS → PCM 응답 스트림
 
 ## 주요 추상화
 
-- `createRetriedAudioSource` (`src/app/api/tts/route.ts`): Gemini AsyncIterable 재시도·취소 래퍼.
-- `preparePcmStream` (`src/app/api/tts/stream.ts`): Gemini 응답과 Web Streams API 사이의 경계.
+- `TtsRequest`/`parseTts` (`src/lib/tts-contract.ts`): 구조화한 모델·화자·발화·출력 계약과 기존 text/voice 입력 호환.
+- `wireRequest`/`requestGroups`/`openPcm` (`src/lib/gemini-tts.ts`): REST 직렬화, 대화 실행 단위, Web Stream과 AbortSignal 경계.
+- `AppError`/`errorResponse` (`src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`): HTTP 상태와 공개 가능한 오류 메시지.
+- `voiceRef` (`src/lib/voice-catalog.ts`): 기본 이름·확장 ID·저장 custom·비저장 replica 참조 구분.
 - `StreamingPcmPlayer` (`src/utils/streaming-player.ts`): Promise 체인으로 activate/enqueue/close 순서를 직렬화.
 
 ## 진입점
@@ -78,21 +96,24 @@ Gemini 3.1 Flash TTS → PCM 응답 스트림
 - `POST /api/tts`: `src/app/api/tts/route.ts`가 PCM 스트림 또는 JSON 오류를 반환한다.
 - `GET /api/health`: `src/app/api/health/route.ts`가 상태를 반환한다.
 
+- `/api/voices`와 `/api/voices/[id]`: 목록·생성·조회·삭제 (`src/app/api/voices/route.ts`, `src/app/api/voices/[id]/route.ts`).
+- `/api/batches`, `/api/batches/[id]`, `/api/batches/[id]/results`: 제출·목록·조회·취소·삭제·우선순위·결과 (`src/app/api/batches/`).
+
 ## 아키텍처 제약
 
 - 서버 Route Handler와 브라우저 클라이언트 컴포넌트가 분리된다.
-- 모듈 수준 `GoogleGenAI` 인스턴스와 요청별 `AbortController`를 사용한다 (`src/app/api/tts/route.ts`).
-- 오디오 계약은 PCM S16LE, 24,000Hz, mono다.
-- 클라이언트와 서버 모두 텍스트 1,000자 제한을 적용한다.
+- REST 키는 요청 시 로드하고 합성에는 요청별 `AbortController`를 사용한다 (`src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`).
+- 브라우저 전송 계약은 PCM16LE mono, 8/16/24kHz다. L16/WAV/μ-law/A-law upstream 출력과 브라우저 내부 형식을 혼동하지 않는다 (`src/utils/audio-format.ts`).
+- 공유 검증은 전체 대본 1,000자·연출 4,000자·화자 2명·발화 20개를 제한한다. Batch는 확장 후 요청 20개·입력 1MiB, 오디오는 32MiB다 (`src/lib/tts-contract.ts`, `src/lib/gemini-batches.ts`, `src/utils/audio-format.ts`).
 - `.env.local`은 환경 설정 파일이며 내용은 문서화하지 않는다.
 
 ## 오류 처리
 
-서버는 429 한도, 종료 사유, 취소를 구분해 JSON 오류를 반환한다 (`src/app/api/tts/route.ts`). 스트림 계층은 잘못된 Base64, 오디오 없음, 비정상 종료, 홀수 PCM 길이를 거부한다 (`src/app/api/tts/stream.ts`). 클라이언트는 요청 ID로 오래된 비동기 결과를 무시하고 reader를 finally에서 정리한다 (`src/app/page.tsx`).
+서버는 정제한 `AppError` JSON을 반환한다 (`src/lib/gemini-client.ts`). 합성은 정상 STOP·형식·크기를 확인하고, 첫 오디오 전 명시된 분당 429(1~65초) 또는 finishReason OTHER를 1회 재시도한다. 오디오 이후 오류와 일일 한도는 재시도하지 않는다 (`src/lib/gemini-tts.ts`). 클라이언트는 요청 ID로 오래된 결과를 무시하고 reader·재생기를 정리한다 (`src/app/page.tsx`).
 
 ## 공통 관심사
 
-**로깅:** 서버 오류와 클라이언트 재생·정리 오류를 `console.error`로 기록한다.  
+**로깅:** 클라이언트 재생·정리 오류는 `console.error`, 서버 공개 오류는 정제 응답을 사용한다 (`src/app/page.tsx`, `src/lib/gemini-client.ts`).
 **검증:** 텍스트 길이와 오디오 형식을 경계 양쪽에서 검증한다.  
 **인증:** 별도 사용자 인증은 없으며 Gemini 인증은 `GEMINI_API_KEY` 환경 변수다.
 

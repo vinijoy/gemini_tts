@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BASIC_VOICES, type CatalogVoice } from "@/lib/voice-catalog";
 import { base64Bytes, parseWav } from "@/utils/audio-format";
+export function Announce({message}:{message:string}){useEffect(()=>{if(message)window.dispatchEvent(new CustomEvent("tts-status",{detail:message}));},[message]);return <p>{message}</p>;}
 export async function api<T>(url: string, init: RequestInit = {}): Promise<T> { const r = await fetch(url, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", ...init.headers } }); let body; try {
     body = await r.json();
 }
@@ -20,11 +21,15 @@ export default function VoiceLibrary({ label, onSelect, disabled = false }: {
     onSelect: (voice: CatalogVoice) => void;
     disabled?: boolean;
 }) {
+    const [catalogSource,setCatalogSource]=useState("provided");
     const [source, setSource] = useState("prebuilt"), [filters, setFilters] = useState<Record<string, string>>({}), [voices, setVoices] = useState<CatalogVoice[]>([]), [token, setToken] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [selected, setSelected] = useState<CatalogVoice | null>(null);
     const generation = useRef(0), seen = useRef(new Set<string>()), controller = useRef<AbortController | null>(null);
+    const queryButton=useRef<HTMLButtonElement>(null),restoreFocus=useRef(false);
+    useEffect(()=>{if(!busy&&restoreFocus.current){restoreFocus.current=false;queryButton.current?.focus();}},[busy]);
     useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
-    async function load(more = false) { controller.current?.abort(); const control = new AbortController(); controller.current = control; const run = ++generation.current; setBusy(true); setMessage(""); try {
+    async function load(more = false) { restoreFocus.current=true;controller.current?.abort(); const control = new AbortController(); controller.current = control; const run = ++generation.current; setBusy(true); setMessage(""); try {
         const q = new URLSearchParams({ type: source, page_size: "50" });
+        if(catalogSource==="provided")q.set("source","provided");
         for (const [k, v] of Object.entries(filters))
             if (v.trim())
                 for (const part of (k === "search" ? [v] : v.split(",")))
@@ -58,5 +63,5 @@ export default function VoiceLibrary({ label, onSelect, disabled = false }: {
     return <fieldset disabled={disabled || busy} className="border rounded-xl p-3"><legend>{label} 목소리 라이브러리</legend><label>{label} 공식 기본 목소리<select defaultValue="" onChange={e => { const v = BASIC_VOICES.find(v => v.id === e.target.value); if (v) {
         setSelected(v);
         onSelect(v);
-    } }}><option value="">선택하세요.</option>{BASIC_VOICES.map(v => <option key={v.id} value={v.id}>{v.name} — {v.description}</option>)}</select></label><details><summary>확장·저장 목소리 검색</summary><label>목소리 종류<select value={source} onChange={e => { setSource(e.target.value); setToken(""); }}><option value="prebuilt">공식 확장 목소리</option><option value="prompted">저장 설계 목소리</option><option value="replicated">저장 복제 목소리</option></select></label>{Object.entries({ language_code: "언어 코드", region_code: "지역 코드", accent: "억양", gender: "성별 표현 (female, male, neutral)", pitch: "높낮이 (low, medium, high)", persona: "인물 특성", contexts: "용도", search: "이름·설명 검색" }).map(([key, name]) => <label key={key}>{label} {name}<input value={filters[key] ?? ""} maxLength={key === "search" ? 2048 : 256} onChange={e => { setFilters({ ...filters, [key]: e.target.value }); setToken(""); }}/></label>)}<p>같은 필터의 쉼표로 구분한 값은 OR, 서로 다른 필터는 AND입니다. 검색은 2,048바이트 제한입니다.</p><button type="button" onClick={() => void load()}>목록 조회</button><ul>{voices.map(v => <li key={v.id}><button type="button" onClick={() => { setSelected(v); onSelect(v); }}>{v.name} · {v.id} · {v.languages.join(", ") || "언어 미제공"}</button></li>)}</ul>{token && <button type="button" onClick={() => void load(true)}>목소리 더 보기</button>}</details><p>{message}</p>{selected && <p>선택 목소리: {selected.name} · {selected.description}</p>}</fieldset>;
+    } }}><option value="">선택하세요.</option>{BASIC_VOICES.map(v => <option key={v.id} value={v.id}>{v.name} — {v.description}</option>)}</select></label><details><summary>확장·저장 목소리 검색</summary><label>목록 출처<select value={catalogSource} onChange={e=>{setCatalogSource(e.target.value);setSource("prebuilt");setVoices([]);setToken("");}}><option value="provided">사용자 제공 목록 2,089개 (2026-10-01)</option><option value="remote">현재 API 키로 조회</option></select></label><p>제공 목록은 현재 키의 합성 가능 여부를 보장하지 않습니다.</p><label>목소리 종류<select value={source} onChange={e => { setSource(e.target.value);if(e.target.value!=="prebuilt")setCatalogSource("remote"); setToken(""); }}><option value="prebuilt">공식 확장 목소리</option><option value="prompted">저장 설계 목소리</option><option value="replicated">저장 복제 목소리</option></select></label>{Object.entries({ language_code: "언어 코드", region_code: "지역 코드", accent: "억양", gender: "성별 표현 (female, male, neutral)", pitch: "높낮이 (low, medium, high)", persona: "인물 특성", contexts: "용도", search: "이름·설명 검색" }).map(([key, name]) => <label key={key}>{label} {name}<input value={filters[key] ?? ""} maxLength={key === "search" ? 2048 : 256} onChange={e => { setFilters({ ...filters, [key]: e.target.value }); setToken(""); }}/></label>)}<p>같은 필터의 쉼표로 구분한 값은 OR, 서로 다른 필터는 AND입니다. 검색은 2,048바이트 제한입니다.</p><button ref={queryButton} type="button" onClick={() => void load()}>목록 조회</button><ul>{voices.map(v => <li key={v.id}><button type="button" onClick={() => { setSelected(v); onSelect(v); }}>{v.name} · {v.id} · {v.languages.join(", ") || "언어 미제공"}</button></li>)}</ul>{token && <button type="button" onClick={() => void load(true)}>목소리 더 보기</button>}</details><Announce message={message}/>{selected && <p>선택 목소리: {selected.name} · {selected.description}</p>}</fieldset>;
 }

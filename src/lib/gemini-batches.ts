@@ -33,9 +33,10 @@ export async function createBatch(value: unknown) {
     if (!MODELS.includes(b.model as TtsRequest["model"]) || !Array.isArray(b.items) || b.items.length < 1 || b.items.length > 20)
         throw new AppError(400, "Batch 모델 또는 최대 20개인 앱 항목 제한이 올바르지 않습니다.");
     const displayName = string(b.displayName ?? "TTS Batch", 100, "Batch 이름");
+    const itemCount=b.items.length;
     const requests = b.items.flatMap((item, group) => { const raw = object(item); if ("model" in raw)
         throw new AppError(400, "Batch 항목별 모델 재지정은 허용되지 않은 상태입니다."); const request = parseTts({ ...raw, model: b.model }); if (request.speakers.some(s => s.voice.kind === "ephemeral-replica"))
-        throw new AppError(400, "비저장 목소리 키는 이 앱의 Batch 제출에서 지원하지 않는 상태입니다."); const groups = requestGroups(request); return groups.map((turns, order) => ({ request: wireRequest(request, turns), metadata: { key: `tts-v1-${group}-${order}-${groups.length}-${request.output.sampleRate}-${request.output.encoding}` } })); });
+        throw new AppError(400, "비저장 목소리 키는 이 앱의 Batch 제출에서 지원하지 않는 상태입니다."); const groups = requestGroups(request); return groups.map((turns, order) => ({ request: wireRequest(request, turns), metadata: { key: `tts-v2-${itemCount}-${group}-${order}-${groups.length}-${request.output.sampleRate}-${request.output.encoding}` } })); });
     if (requests.length > 20)
         throw new AppError(400, "순차 턴 확장 후 최대 20개인 Batch 앱 제한을 넘은 상태입니다.");
     const body = JSON.stringify({ batch: { displayName, inputConfig: { requests: { requests } } } });
@@ -110,6 +111,7 @@ export async function batchResults(id: string): Promise<{
         failed: boolean;
     }>();
     const results: Result[] = [];
+    let expectedGroups:number|null=null;
     let total = 0;
     for (const value of rows) {
         const row = object(value);
@@ -117,12 +119,15 @@ export async function batchResults(id: string): Promise<{
         if (seen.has(key))
             throw new AppError(502, "중복 Batch 결과 키인 상태입니다.");
         seen.add(key);
-        const match = /^tts-v1-(\d+)-(\d+)-(\d+)-(8000|16000|24000)-(AUDIO_L16|AUDIO_WAV|AUDIO_MULAW|AUDIO_ALAW)$/.exec(key);
+        const v2=/^tts-v2-(\d+)-(.+)$/.exec(key);
+        if(v2){const count=Number(v2[1]);if(count<1||count>20||expectedGroups!==null&&expectedGroups!==count)throw new AppError(502,"Batch 전체 항목 수가 일치하지 않은 상태입니다.");expectedGroups=count;}
+        const match = /^tts-v1-(\d+)-(\d+)-(\d+)-(8000|16000|24000)-(AUDIO_L16|AUDIO_WAV|AUDIO_MULAW|AUDIO_ALAW)$/.exec(v2?`tts-v1-${v2[2]}`:key);
         if (!match) {
             results.push({ key, group: key, state: "failed", error: "이 앱의 요청 정보가 없는 결과입니다." });
             continue;
         }
         const [, group, orderText, countText, rateText, encoding] = match;
+        if(expectedGroups!==null&&Number(group)>=expectedGroups)throw new AppError(502,"Batch 그룹 번호가 범위를 벗어난 상태입니다.");
         const order = Number(orderText), expected = Number(countText), rate = Number(rateText);
         if (expected < 1 || expected > 20 || order >= expected)
             throw new AppError(502, "Batch 결과 순서가 올바르지 않은 상태입니다.");
@@ -164,13 +169,15 @@ export async function batchResults(id: string): Promise<{
             const key = String(object(object(row).metadata ?? {}).key ?? "");
             if (!seen.has(key)) {
                 results.push({ key, group: key, state: "failed", error: "요청한 항목의 결과가 누락된 상태입니다." });
-                const group = key.split("-")[2];
+                const group = key.split("-")[key.startsWith("tts-v2-")?3:2];
                 const g = groups.get(group);
                 if (g)
                     g.failed = true;
             }
         }
     }
+    if(expectedGroups!==null){for(let i=0;i<expectedGroups;i++)if(!groups.has(String(i)))results.push({key:`missing-group-${i}`,group:String(i),state:"failed",error:"이 항목의 모든 결과가 누락된 상태입니다."});}
+    if(rows.length===0)throw new AppError(502,"Batch 결과 항목이 비어 있는 상태입니다.");
     for (const [group, g] of groups) {
         if (g.failed || g.items.size !== g.expected) {
             results.push({ key: `group-${group}`, group, state: "failed", error: "모든 발화가 성공하지 않아 완성본을 만들 수 없는 상태입니다." });

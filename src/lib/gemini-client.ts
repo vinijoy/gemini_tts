@@ -16,7 +16,7 @@ export function apiKey(): string {
 export async function upstream(path: string, init: RequestInit = {}): Promise<Response> {
     if (!/^\/(?:v1beta|download\/v1beta|upload\/v1beta)\//.test(path) || path.includes("..") || path.includes("\\"))
         throw new AppError(400, "서비스 경로가 올바르지 않습니다.");
-    const response = await fetch(HOST + path, { ...init, cache: "no-store", redirect: "error", headers: { "Content-Type": "application/json", ...init.headers, "x-goog-api-key": apiKey() } });
+    const response = await fetch(HOST + path, { ...init, cache: "no-store", redirect: "error", signal: init.signal ? AbortSignal.any([init.signal,AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000), headers: { "Content-Type": "application/json", ...init.headers, "x-goog-api-key": apiKey() } });
     if (!response.ok) {
         const status = response.status;
         let retry: number | null = null;
@@ -24,7 +24,7 @@ export async function upstream(path: string, init: RequestInit = {}): Promise<Re
             const detail = await limitedText(response, 16384).catch(() => "");
             const match = detail.match(/retryDelay[\"]?\s*:\s*[\"]?([0-9.]+)s/i) ?? detail.match(/retry in ([0-9.]+)s/i);
             const seconds = Number(response.headers.get("retry-after") ?? match?.[1]);
-            if (/GenerateRequestsPerMinute|generate_requests_per_model/i.test(detail) && !/GenerateRequestsPerDay|generate_content_free_tier_requests/i.test(detail) && seconds >= 1 && seconds <= 10)
+            if (/GenerateRequestsPerMinute|generate_requests_per_model/i.test(detail) && !/GenerateRequestsPerDay|generate_content_free_tier_requests/i.test(detail) && seconds >= 1 && seconds <= 65)
                 retry = seconds * 1000;
         }
         else

@@ -1,3 +1,5 @@
+import { beforeEach as prepareTestKey } from "vitest";
+prepareTestKey(()=>vi.stubEnv("GEMINI_API_KEY","test-key-not-a-secret"));
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,6 +8,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Home from "./page";
 import { POST } from "./api/tts/route";
 import VoiceStudio from "./components/VoiceStudio";
+import VoiceLibrary from "./components/VoiceLibrary";
 import BatchPanel from "./components/BatchPanel";
 import { defaultRequest } from "./components/TtsEditor";
 import { POST as voicePost } from "./api/voices/route";
@@ -36,6 +39,7 @@ vi.mock("@/utils/streaming-player", () => ({
 }));
 let streamController!: ReadableStreamDefaultController<Uint8Array>;
 let streamSettled = false;
+it("목록 조회가 끝나면 키보드 초점을 조회 버튼으로 복원한다",async()=>{streamSettled=true;vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({voices:[],nextPageToken:""}))));const user=userEvent.setup();render(<VoiceLibrary label="화자 A" onSelect={()=>{}}/>);await user.click(screen.getByText("확장·저장 목소리 검색"));const button=screen.getByRole("button",{name:"목록 조회"});await user.click(button);await waitFor(()=>expect(button).toHaveFocus());expect(fetch).toHaveBeenCalledWith(expect.stringContaining("source=provided"),expect.anything());});
 
 it("홈에서 목소리 제작과 Batch 패널을 열고 닫을 수 있다",async()=>{const user=userEvent.setup();render(<Home/>);await user.click(screen.getByRole("button",{name:"목소리 제작·관리 열기"}));expect(screen.getByRole("region",{name:"목소리 제작과 관리"})).toBeVisible();await user.click(screen.getByRole("button",{name:"Batch 작업 열기"}));expect(screen.getByRole("region",{name:"Batch 작업"})).toBeVisible();await user.click(screen.getByRole("button",{name:"Batch 작업 닫기"}));expect(screen.queryByRole("region",{name:"Batch 작업"})).toBeNull();expect(fetch).not.toHaveBeenCalled();});
 it("키보드로 Design을 제출하고 실제 앱 API가 반환한 저장 음성을 선택한다", async () => {

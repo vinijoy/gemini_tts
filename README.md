@@ -1,64 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gemini 3.8 TTS
 
-## Getting Started
+한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. 서버의 `GEMINI_API_KEY` 또는 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20 이상에서 `npm ci`, `npm run dev`로 시작한 뒤 http://localhost:3000 을 여세요.
 
-First, run the development server:
+## 대본과 음성 생성
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- 기본값은 Flash, Puck, Standard, L16 24kHz입니다. Flash-Lite도 같은 편집 화면에서 선택합니다.
+- 대본은 그대로 발화하고 연출은 별도 정보로 전달합니다. 발성·휴지는 `<laugh>`, `<sigh>`, `<cough>`, `<breath>`, `<short pause>`, `<long pause>` 버튼으로 넣습니다. 감정·속삭임 등의 지속 연출은 연출 입력란에 작성하세요.
+- 기본 두 화자는 하나의 요청에 정확한 화자 이름을 대응시킵니다. 맞춤 목소리를 포함하는 두 화자는 발화별로 순차 생성합니다. 각 발화의 화자·연출을 편집하고 추가·삭제·순서 변경 버튼을 사용할 수 있습니다.
+- 앱 제한은 화자 2명, 발화 20개, 전체 대본 1,000자, 발화별 연출 1,000자·전체 연출 4,000자입니다. 공식 API의 전체 한도를 의미하지 않습니다.
+- 첫 PCM부터 재생하고 취소할 수 있습니다. 마지막 발화가 정상 종료된 경우에만 다시 듣기와 다운로드가 활성화됩니다. 연결 단절·잘린 오디오·후속 발화 실패는 완성본으로 표시하지 않습니다.
+- WAV, L16, μ-law, A-law와 8/16/24kHz를 선택할 수 있습니다. 이 세 rate는 앱 선택값이며 공식 전체 enum이 아닙니다. WAV는 파일 구조를 검증한 뒤 재생하고 G.711은 PCM으로 풀어 재생합니다. 선택 형식 다운로드와 WAV 다운로드를 별도로 제공합니다. 여러 발화는 PCM으로 정규화해 결합합니다. 오디오는 실행당 최대 32MiB입니다.
+- Standard/Flex/Priority는 요청 등급입니다. 화면의 실제 등급은 응답 헤더로 확인하며, 헤더가 없거나 여러 순차 요청의 전체 등급을 확정할 수 없으면 미확인입니다. Priority 요청도 Standard로 처리될 수 있습니다. Flex를 다른 비용 등급으로 자동 전환하지 않습니다. 요청은 최대 120초로 제한하며 취소할 수 있습니다.
+- 첫 출력 전 확인된 분당 429 한도만 제공된 1~65초 대기 시간으로 한 번 재시도합니다. 일일 한도·알 수 없는 429는 자동 재시도하지 않습니다. 첫 출력 전 OTHER 종료는 한 번 재시도하며 첫 출력 후에는 어떤 발화도 자동 재시도하지 않습니다.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 목소리 라이브러리와 제작
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+화자 A/B에서 같은 라이브러리를 사용합니다. 공식 기본 30개 외에 언어·지역·억양·성별 표현·높낮이·인물 특성·용도·이름/설명을 검색하고 다음 페이지를 조회할 수 있습니다. 같은 필터의 여러 값은 OR, 서로 다른 필터는 AND입니다. 검색은 UTF-8 2,048바이트, 페이지는 앱 제한 50개입니다. 미제공 메타데이터를 이름으로 추정하지 않습니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+목소리 제작·관리 패널에서 다음 작업을 명시적으로 실행합니다.
 
-## Learn More
+- **Voice Design:** 1~2문장 설명으로 저장 목소리를 생성합니다. 설명 2,000자는 앱 제한입니다. 반환된 목소리는 즉시 화자 A에 선택할 수 있습니다.
+- **Voice Replication:** 같은 성인 본인의 참조 녹음과 공식 동의문 녹음을 따로 선택하고, 본인 동의·동일 화자·동의문 확인을 모두 체크합니다. 영어 공식 문구와 출처를 화면에 표시하며 한국어 번역을 공식 문구로 주장하지 않습니다.
+- 복제는 이 앱에서 **모노 PCM16 WAV만 지원**합니다. 공식 AudioData가 예시로 언급한 MPEG 등의 모든 형식을 지원한다고 주장하지 않습니다. 참조 10~30초는 공식 조건이며 24kHz WAV는 권장입니다. 파일당 5MiB·동의 최대 60초는 앱 제한입니다. 서버도 실제 RIFF·길이를 검사합니다.
+- 저장형은 프로젝트 공유 최대 200개, 마지막 사용 후 1년 TTL입니다. 비저장 복제 키는 7일 유효하며 현재 화면 메모리에만 두므로 새로고침하면 사라집니다. 녹음 파일을 앱 서버 디스크나 로그에 저장하지 않습니다.
+- 저장 목소리는 ID로 조회·선택·삭제합니다. 삭제 대상 확인이 필요합니다. 제공된 설계 목소리 preview만 검증 후 재생하며 preview가 없는 목소리를 재생 가능으로 표시하지 않습니다.
+- **Voice Remix는 미완료입니다.** 보관 공식 OpenAPI의 PromptedVoice에는 input만 있고 base_voice/remix 요청 계약이 확인되지 않았습니다. 추정 요청이나 Design 대체 동작을 만들지 않았습니다.
 
-To learn more about Next.js, take a look at the following resources:
+공식 목록과 조회 상태는 [GEMINI-TTS-VOICES.md](GEMINI-TTS-VOICES.md)에 있습니다. 사용자가 다른 프로젝트에서 제공한 2026-10-01 목록 2,089개(한국어 117개)를 원문 그대로 보존하며 앱의 ‘사용자 제공 목록’에서 검색·선택할 수 있습니다. 현재 서버 키의 2026-10-11 실제 GET은 HTTP 400 / INVALID_ARGUMENT / API_KEY_INVALID였으므로 현재 계정의 전수 조회·합성 접근 검증은 미완료입니다. 제공 목록의 과거 수집과 현재 키 접근은 별개입니다. 원문 안의 다른 프로젝트 기본 음성 지시는 이 앱 설정으로 적용하지 않습니다.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Batch 작업
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+현재 대본을 항목으로 담아 명시 제출합니다. 한 작업의 모든 항목은 같은 TTS 모델을 사용합니다. 인라인 제출 또는 검증한 항목을 JSONL 파일로 업로드한 뒤 Files resource로 제출하는 방식을 선택합니다. 두 방식 모두 최대 20개·UTF-8 1MiB 앱 제한을 적용하며 공식 inline 20MB/파일 2GB 한도 전체를 노출하지 않습니다. 임의 기존 Files ID·임의 URL·외부 JSONL을 무검증 제출하는 기능은 없습니다.
 
-## Deploy on Vercel
+작업 이름 `batches/...`를 복사해 보관하면 다시 열 수 있습니다. 목록/페이지, 수동 새로고침과 30초 polling을 지원합니다. SUCCEEDED/FAILED/CANCELLED/EXPIRED에서 polling을 멈춥니다. 패널을 닫으면 polling만 중단되며 원격 작업을 취소하지 않습니다. 취소는 별도 확인 버튼이며 POST 성공만으로 취소 완료라고 표시하지 않습니다. 삭제와 내부 정수 priority 변경도 명시 동작입니다. 내부 priority는 Standard/Flex/Priority 서비스 등급과 다릅니다.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+성공한 작업의 inline 결과 또는 공식 Files JSONL 결과를 최대 32MiB로 회수합니다. key로 항목과 발화 순서를 복원하며 개별 실패·누락을 표시합니다. 모든 발화가 성공한 그룹만 WAV 재생/저장을 제공합니다. 실패 항목을 자동 유료 재제출하지 않습니다. Files 업로드 뒤 제출 응답이 유실되면 중복 제출 전에 목록을 확인해야 합니다.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Webhook 알림은 미구현입니다.** 현재 로컬 앱에는 공개 수신 endpoint·서명 검증 인프라가 없으며 외부 알림을 등록하지 않습니다. 사용자 전체 기능 요청에서 남은 범위로 추적하며 지원 완료나 승인된 제외로 간주하지 않습니다.
 
-## 변경 사항
-- Gemini 3.1 버전에 맞춰 TTS API 파라미터 구조 업데이트 (pitch, speakingRate 제거)
-- UI에 Gemini 3.1 인라인 오디오 감정 태그 추가 (한국어 라벨 제공)
-- API 프롬프트 지침을 감독 모드(director mode)로 최적화하여 태그 인식률 개선
-- 지시어 입력창을 멀티라인 편집창(textarea)으로 변경
-- package.json에 개발/운영 모드 실행 스크립트 추가 (dev:watch, start:watch)
-- package.json 스크립트 수정: pm2를 npx로 실행하도록 변경 및 start:init, start:prod, stop, delete 추가
-- 프로젝트의 기획 및 요구사항을 명세한 PRD.md 문서 추가
-- next.config.ts에 outputFileTracingRoot 설정 추가하여 다중 lockfile 경고 해결
-- 음성 새로 생성 시 이전 완료 문구 및 오디오 플레이어가 즉시 사라지도록 UI 상태 초기화 로직 추가
-- 단일 Gemini 요청의 오디오 청크를 24kHz/16bit/Mono PCM으로 즉시 스트리밍하여 첫 청크부터 자동 재생
-- 생성 중 다시 듣기·다운로드 비활성화, 완료 후 WAV 다시 듣기·다운로드 활성화
-- 본문을 분할하지 않고 최대 1,000자까지 하나의 Gemini TTS 생성 단위로 전송
-- Gemini 응답의 종료 사유를 검사하여 출력 한도 등으로 잘린 부분 오디오가 완성본으로 표시되지 않도록 차단
-- 생성 중과 완료 후 다시 듣기에 동일한 Web Audio 재생 경로와 동일 PCM을 사용하여 재생 음질 일치
-- 첫 PCM 전에 Gemini 모델별 분당 429 제한이 발생하면 Google 권장 시간(1~65초)만큼 기다린 뒤 한 번 자동 복구
-- 무료 일일 할당량은 재시도하지 않고 결제·한도 초기화를 안내하며, 반복된 분당 제한은 권장 대기 시간을 한국어로 반환
-- 입력란은 키보드 입력·붙여넣기·감정 태그 추가 모두 1,000자에서 차단하며 API도 초과 요청을 거부
-- 첫 PCM부터 즉시 재생하며, 오디오 전송 전에 발생한 `OTHER`는 자동 재시도하고 전송 시작 뒤 비정상 종료는 스트림 오류로 처리
+## 검증과 제한
 
-## 검증
-
-```bash
+```sh
 npm test
 npm run lint
+node_modules/.bin/tsc --noEmit
 npm run build
+node scripts/generate-voice-catalog.mjs
 ```
+
+마지막 명령만 인증된 공식 prebuilt GET을 실행하고 별도 GEMINI-TTS-VOICES.generated.md를 생성합니다. 사용자 제공 GEMINI-TTS-VOICES.md를 덮어쓰지 않습니다. 생성·복제·Batch 제출·삭제는 하지 않습니다. 자동 검사는 모의 응답을 사용합니다. 실제 유료 합성·복제·Batch, 한국어 발화 품질·태그 효과·화자 구별, 계정 권한·실제 등급, VoiceOver/NVDA는 별도 미수행입니다. API가 구현됐다는 사실이 실제 계정 가용성을 보장하지 않습니다.
+
+공식 근거는 `docs/google-gemini/`, `docs/google-genai/`, `docs/nextjs/`에 보관합니다. 기능별 근거·검사·남은 범위는 `.planning/quick/261011-mrq-gemini-3-8-flash-tts-flash-lite/261011-mrq-VERIFICATION.md`와 `COVERAGE.md`에서 관리합니다. 기존 로드맵 요구사항과 단계 수용은 이 quick 구현으로 완료 처리하지 않습니다.

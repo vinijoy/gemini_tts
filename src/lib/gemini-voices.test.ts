@@ -1,3 +1,5 @@
+import { beforeEach as prepareTestKey } from "vitest";
+prepareTestKey(()=>vi.stubEnv("GEMINI_API_KEY","test-key-not-a-secret"));
 import { afterEach, expect, it, vi } from "vitest";
 import { listVoices, createVoice, getVoice, voiceQuery, deleteVoice } from "./gemini-voices";
 import { bytesBase64, wavBytes } from "../utils/audio-format";

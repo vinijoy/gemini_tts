@@ -69,6 +69,8 @@ function createDownloadFileName(voice: string, generatedAt: Date) {
 }
 export default function Home() {
     const maxTextLength = 1000;
+    const [announcement,setAnnouncement]=useState("");
+    useEffect(()=>{const receive=(event:Event)=>setAnnouncement((event as CustomEvent<string>).detail);window.addEventListener("tts-status",receive);return()=>window.removeEventListener("tts-status",receive);},[]);
     const [showStudio, setShowStudio] = useState(false);
     const [showBatch, setShowBatch] = useState(false);
     const [options, setOptions] = useState<TtsRequest>(defaultRequest);
@@ -140,7 +142,7 @@ export default function Home() {
         setStatus("streaming");
         setHasStartedPlayback(false);
         setAudioUrl(null);
-        const generatedVoice = voice;
+        const generatedVoice = options.speakers[0].voice.kind==="prebuilt-name"?voice:"custom";
         setDownloadFileName(createDownloadFileName(generatedVoice, new Date()));
         requestControllerRef.current?.abort();
         requestControllerRef.current = null;
@@ -383,7 +385,7 @@ export default function Home() {
 
         <section className="space-y-6">
           <button type="button" aria-expanded={showStudio} onClick={()=>setShowStudio(!showStudio)}>목소리 제작·관리 {showStudio?"닫기":"열기"}</button>
-          {showStudio&&<VoiceStudio onSelect={ref=>setOptions({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:ref}:s)})}/>}
+          {showStudio&&<VoiceStudio onSelect={ref=>{setVoice(ref.value);setOptions({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:ref}:s)});}}/>}
           <button type="button" aria-expanded={showBatch} onClick={()=>setShowBatch(!showBatch)}>Batch 작업 {showBatch?"닫기":"열기"}</button>
           {showBatch&&<BatchPanel request={{...options,speakers:options.speakers.map((s,i)=>i===0&&s.voice.kind==="prebuilt-name"?{...s,voice:{kind:"prebuilt-name",value:voice}}:s),turns:options.turns.map((t,i)=>i===0?{...t,text,style:stylePrompt}:t)}}/>}
           {/* 텍스트 입력부 */}
@@ -401,6 +403,7 @@ export default function Home() {
                 음성 선택
               </label>
               <select id="voice-select" className="w-full p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" value={voice} onChange={(e) => { setVoice(e.target.value); setOptions({ ...options, speakers: options.speakers.map((s, i) => i === 0 ? { ...s, voice: { kind: "prebuilt-name", value: e.target.value } } : s) }); }} disabled={isLoading} aria-label="음성 선택">
+                {!voices.includes(voice)&&<option value={voice}>맞춤 또는 확장 목소리 (선택됨)</option>}
                 {voices.map((v) => (<option key={v} value={v}>
                     {v}
                   </option>))}
@@ -408,7 +411,7 @@ export default function Home() {
             </div>
           </div>
 
-          {options.speakers.map((speaker, i) => <VoiceLibrary key={speaker.id} label={`화자 ${speaker.id}`} disabled={isLoading} onSelect={v => { const ref = voiceRef(v); if (i === 0 && ref.kind === "prebuilt-name")
+          {options.speakers.map((speaker, i) => <VoiceLibrary key={speaker.id} label={`화자 ${speaker.id}`} disabled={isLoading} onSelect={v => { const ref = voiceRef(v); if (i === 0)
         setVoice(ref.value); setOptions({ ...options, speakers: options.speakers.map((s, n) => i === n ? { ...s, voice: ref } : s) }); }}/>)}
           <TtsEditor value={options} onChange={setOptions} disabled={isLoading}/>
           <p>실제 처리 등급: {actualTier === "unknown" ? "미확인" : actualTier}</p>
@@ -417,18 +420,13 @@ export default function Home() {
             <span className="font-semibold text-gray-700">감정 및 효과 태그 (클릭하여 추가)</span>
             <div className="flex flex-wrap gap-2">
               {[
-            { id: "laughs", label: "웃음" },
-            { id: "whispers", label: "속삭임" },
-            { id: "enthusiasm", label: "열정" },
-            { id: "nervousness", label: "긴장" },
-            { id: "determination", label: "단호함" },
-            { id: "frustration", label: "좌절" },
-            { id: "excitement", label: "신남" },
-            { id: "curiosity", label: "호기심" },
-            { id: "tension", label: "긴장감" },
-            { id: "sad", label: "슬픔" },
-            { id: "anger", label: "분노" }
-        ].map(tag => (<button key={tag.id} onClick={() => setText((previousText) => `${previousText}[${tag.id}] `.slice(0, maxTextLength))} disabled={isLoading} className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium hover:bg-pink-200 transition-colors disabled:opacity-50" aria-label={`${tag.label} 태그 추가`}>
+            { id: "laugh", label: "웃음" },
+            { id: "sigh", label: "한숨" },
+            { id: "cough", label: "기침" },
+            { id: "breath", label: "숨소리" },
+            { id: "short pause", label: "짧은 휴지" },
+            { id: "long pause", label: "긴 휴지" }
+        ].map(tag => (<button key={tag.id} onClick={() => setText((previousText) => `${previousText}<${tag.id}> `.slice(0, maxTextLength))} disabled={isLoading} className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-medium hover:bg-pink-200 transition-colors disabled:opacity-50" aria-label={`${tag.label} 태그 추가`}>
                   {tag.label}
                 </button>))}
             </div>
@@ -440,11 +438,11 @@ export default function Home() {
             <label htmlFor="style-prompt" className="font-semibold text-gray-700">
               스타일 및 감정 지시어 (Prompt)
             </label>
-            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="스타일 및 감정 입력창"/>
+            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} maxLength={1000} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="스타일 및 감정 입력창"/>
           </div>
 
           <div role="status" aria-live="polite" className="sr-only">
-            {statusMessage}
+            {statusMessage || announcement}
           </div>
 
           {/* 버튼부 */}

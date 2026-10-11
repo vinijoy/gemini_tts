@@ -1,6 +1,7 @@
 import { AppError, MODELS, object, resourceId, string } from "./tts-contract";
 import { upstreamJson, upstream } from "./gemini-client";
-import { catalogVoice, type CatalogVoice } from "./voice-catalog";
+import { catalogVoice,parseProvidedCatalog, type CatalogVoice } from "./voice-catalog";
+import { readFile } from "node:fs/promises";
 import { base64Bytes, parseWav } from "../utils/audio-format";
 export const CONSENT_PHRASE = "I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.";
 const filters = ["type", "language_code", "region_code", "accent", "gender", "pitch", "persona", "context"];
@@ -28,7 +29,9 @@ export function voiceQuery(query: URLSearchParams) { const out = new URLSearchPa
         throw new AppError(400, "지원되지 않는 목소리 필터입니다.");
 } if (!out.has("page_size"))
     out.set("page_size", "50"); return out; }
-export async function listVoices(query: URLSearchParams) { const raw = object(await upstreamJson(`/v1beta/voices?${voiceQuery(query)}`)); if (raw.voices !== undefined && !Array.isArray(raw.voices))
+export async function listVoices(query: URLSearchParams) {
+ if(query.get("source")==="provided"){const local=new URLSearchParams(query);local.delete("source");const q=voiceQuery(local);const document=await readFile("GEMINI-TTS-VOICES.md","utf8");if(document.length>2*1024*1024)throw new AppError(413,"제공 목록이 앱의 2MiB 제한을 넘은 상태입니다.");let voices=parseProvidedCatalog(document);const fields:Record<string,keyof CatalogVoice>={type:"type",language_code:"languages",region_code:"regions",gender:"gender",pitch:"pitch",accent:"accent",persona:"persona",context:"contexts"};for(const [key,field] of Object.entries(fields)){const values=q.getAll(key).map(v=>v.toLowerCase());if(values.length)voices=voices.filter(v=>{const raw=v[field];return (Array.isArray(raw)?raw:[raw]).some(x=>typeof x==="string"&&values.includes(x.toLowerCase()));});}const search=q.get("search")?.toLowerCase();if(search)voices=voices.filter(v=>`${v.name} ${v.description}`.toLowerCase().includes(search));const token=q.get("page_token")??"0";if(!/^\d{1,6}$/.test(token))throw new AppError(400,"제공 목록 페이지가 올바르지 않습니다.");const offset=Number(token),size=Number(q.get("page_size"));return {voices:voices.slice(offset,offset+size),nextPageToken:offset+size<voices.length?String(offset+size):"",totalCount:voices.length,catalogSource:"사용자 제공 2026-10-01 목록 (현재 키의 접근 검증과 별도)"};}
+ const raw = object(await upstreamJson(`/v1beta/voices?${voiceQuery(query)}`)); if (raw.voices !== undefined && !Array.isArray(raw.voices))
     throw new AppError(502, "목소리 목록이 올바르지 않은 상태입니다."); const voices = (raw.voices as unknown[] | undefined ?? []).map(catalogVoice); const unique = [...new Map(voices.map(v => [v.id, v])).values()]; if (unique.some(v => !v.id))
     throw new AppError(502, "목록 식별자가 없는 상태입니다."); return { voices: unique, nextPageToken: typeof raw.next_page_token === "string" ? raw.next_page_token : "" }; }
 function preview(raw: Record<string, unknown>, voice: CatalogVoice) { if (raw.sample_audio && voice.type === "prompted") {
