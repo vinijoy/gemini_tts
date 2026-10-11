@@ -1,7 +1,26 @@
+---
+last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
+refreshed: 2026-10-12
+mapping_scope: incremental-dialogue-only
+mapped_paths:
+  - src/lib/tts-contract.ts
+  - src/lib/gemini-tts.ts
+  - src/lib/gemini-tts.test.ts
+  - src/app/api/tts/route.ts
+  - src/app/api/tts/route.test.ts
+  - src/app/components/TtsEditor.tsx
+  - src/app/page.tsx
+  - src/app/page.test.tsx
+  - src/app/generation-order.test.tsx
+  - README.md
+---
+
 # 테스트 패턴
 
 **분석일:** 2026-10-11  
 **마지막 매핑 커밋:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
+
+**부분 갱신 (2026-10-12, `230a846`):** frontmatter의 `mapped_paths` 중 대사별 생성·제한과 관련 회귀만 갱신했다. 본문의 기존 분석일·전체 매핑 기준은 유지하며 전체 재분석을 뜻하지 않는다.
 
 ## 테스트 프레임워크
 
@@ -66,15 +85,22 @@ async function* responses() {
 
 ## 기능별 계약 테스트
 
-- `src/lib/gemini-tts.test.ts`, `src/app/api/tts/route.test.ts`: Gemini 3.8 모델·연출 직렬화, 잘못된 계약 사전 거부, 정상 STOP, MIME/PCM 경계, 첫 청크 전달, bounded 429 재시도, 취소, 순차 custom 대화.
+- `src/lib/gemini-tts.test.ts`, `src/app/api/tts/route.test.ts`: Gemini 3.8 모델·연출 직렬화, 잘못된 계약 사전 거부, 정상 STOP, MIME/PCM 경계, 첫 청크 전달, bounded 429 재시도, 취소, 모든 모드의 대사별 순차 생성.
 - `src/lib/gemini-voices.test.ts`: 반복 OR 필터, 페이지 제한, prompted/replicated payload, 동의 확인, 녹음 시간·WAV 구조, private 필드 제거.
 - `src/lib/gemini-batches.test.ts`: 상태 정규화, inline/Files JSONL 제출, 업로드 URL 제한, 결과 키·순서·누락·부분 실패, 취소 후 조회, 우선순위 변경.
 - `src/lib/voice-catalog.test.ts`: 제공 Markdown 파싱 및 공개 prebuilt만 보존, 정렬·escaping, 빈 중간 페이지·중복 제거, 반복 토큰 거부, 실패 시 미완료와 fallback.
 - 추가 테스트는 같은 위치에 두고 실제 upstream 대신 fetch 응답 fixture를 제공한다. 앱 테스트가 유료 API를 호출하거나 실제 스크린리더 수용을 입증한다고 해석하지 않는다.
 
+### 대사 생성·자원 경계 회귀
+
+- `src/lib/gemini-tts.test.ts`: 합산 본문 1,000자·연출 4,000자 초과와 21턴 허용, 짧은 수동 대사도 분리, 두 모델×세 모드의 직접 API 장문 무손실 분할·연출 보존·요청별 예산을 검사한다.
+- `src/app/api/tts/route.test.ts`: 1MiB/128개 계획의 사전 거부, 최대 voice ref와 한글 본문·연출 1,000자씩 128행 허용, 4형식×3rate, 32MiB 누적 경계/초과, 뒤 요청 실패·대기 reader 취소·그룹별 PCM 경계를 검사한다.
+- `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`: Home→실제 POST→mock provider의 독립 대사·연출과 완성 WAV, 21행·입력칸별 maxlength, DOM 순서·탭 보존, 뒤 실패·용량 초과 시 완성 파일 부재를 검사한다. 자동 조각 편집 UI 계약은 없다.
+- `.planning/quick/261012-atd-dialogue-chunking/261012-atd-SUMMARY.md`에 18파일 177 tests·lint·TypeScript·production build 통과가 기록되어 있다. 이 지도 갱신에서 재실행하지 않았으며 실제 유료 음성·경계 청취·이번 VoiceOver/NVDA는 대기다.
+
 ## 커버리지
 
-명시적 커버리지 임계값은 없다. 입력 1,000자 제한, Base64/PCM 경계, REST 오류·할당량·재시도, 스트림 취소, 자동재생 실패를 포함한다.
+명시적 커버리지 임계값은 없다. 입력칸별 1,000자 제한, Base64/PCM 경계, REST 오류·할당량·재시도, 스트림 취소, 자동재생 실패를 포함한다.
 
 ```bash
 npx vitest run --coverage

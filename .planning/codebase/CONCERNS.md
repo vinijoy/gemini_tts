@@ -1,7 +1,26 @@
+---
+last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
+refreshed: 2026-10-12
+mapping_scope: incremental-dialogue-only
+mapped_paths:
+  - src/lib/tts-contract.ts
+  - src/lib/gemini-tts.ts
+  - src/lib/gemini-tts.test.ts
+  - src/app/api/tts/route.ts
+  - src/app/api/tts/route.test.ts
+  - src/app/components/TtsEditor.tsx
+  - src/app/page.tsx
+  - src/app/page.test.tsx
+  - src/app/generation-order.test.tsx
+  - README.md
+---
+
 # Codebase Concerns
 
 **Analysis Date:** 2026-10-11
 **Last mapped commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
+
+**부분 갱신 (2026-10-12, `230a846`):** frontmatter의 `mapped_paths` 중 대사별 생성·제한과 관련 회귀만 갱신했다. 본문의 기존 분석일·전체 매핑 기준은 유지하며 전체 재분석을 뜻하지 않는다.
 
 ## Tech Debt
 
@@ -32,7 +51,7 @@
 ## Performance Bottlenecks
 
 **순차 대화·재시도의 총 소요 시간:**
-- Problem: custom 대화의 여러 턴과 재시도는 개별 요청 시간 제한보다 전체 소요 시간이 길어질 수 있다.
+- Problem: 모든 모드의 대사별 요청·직접 API 장문 분할과 재시도는 개별 요청 시간 제한보다 전체 소요 시간이 길어질 수 있다.
 - Files: `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`
 - Cause: 일반 upstream 요청은 120초 timeout을 적용하고 분당 429는 1~65초 대기한다. 전체 대화 총 시간 제한은 별도다.
 - Improvement path: 실제 응답 시간을 측정한 뒤 전체 요청 deadline과 진행 안내를 검토한다.
@@ -48,10 +67,16 @@
 ## Scaling Limits
 
 **메모리 내 완성 오디오 보관:**
-- Files: `src/app/page.tsx`, `src/utils/audio-format.ts`, `src/lib/gemini-batches.ts`
-- Current capacity: 오디오 32MiB, Batch 확장 후 20개·입력 1MiB. 전체 PCM을 `completedPcmRef`와 WAV Blob URL에 보관하며 Batch 결과는 Base64 JSON도 함께 생성한다.
+- Files: `src/app/page.tsx`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.ts`, `src/app/api/tts/route.ts`, `src/utils/audio-format.ts`
+- Current capacity: TTS raw JSON·정규화 작업 1MiB, 계획 128개 요청, 요청별 본문 1,000 code points·wire 18,000 UTF-8 bytes, 누적 PCM 32MiB. 화면 입력칸은 대본·연출 각각 1,000자를 유지한다. 전체 PCM을 `completedPcmRef`와 WAV Blob URL에 보관한다.
 - Limit: 여러 결과를 반복 생성할 때 브라우저 메모리 부담이 커질 수 있다.
 - Scaling path: 새 결과·언마운트 시 PCM 버퍼와 Blob URL 해제를 단일 수명 주기 함수로 통합한다.
+
+**독립 요청 사이의 음질·모델 수용:**
+- Files: `src/lib/gemini-tts.ts`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.test.ts`
+- Risk: 독립 요청 사이 억양·목소리·언어·연출 일관성은 mock PCM 결합으로 확인할 수 없다. 18,000-byte 앱 예산은 공식 토큰 계산이나 provider 수용 보증이 아니다.
+- Current mitigation: 원래 대사·연출 경계를 유지하고 전체 계획을 사전 검증한다. 직접 API 장문은 grapheme·완전한 태그·공백을 보존한다.
+- Follow-up: 실제 모델 청취·이번 변경의 VoiceOver/NVDA는 `.planning/quick/261012-atd-dialogue-chunking/261012-atd-SUMMARY.md`, `.planning/ui-followup.md`의 대기 범위를 따른다.
 
 ## Dependencies at Risk
 

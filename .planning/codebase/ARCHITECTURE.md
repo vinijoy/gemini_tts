@@ -1,3 +1,20 @@
+---
+last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
+refreshed: 2026-10-12
+mapping_scope: incremental-dialogue-only
+mapped_paths:
+  - src/lib/tts-contract.ts
+  - src/lib/gemini-tts.ts
+  - src/lib/gemini-tts.test.ts
+  - src/app/api/tts/route.ts
+  - src/app/api/tts/route.test.ts
+  - src/app/components/TtsEditor.tsx
+  - src/app/page.tsx
+  - src/app/page.test.tsx
+  - src/app/generation-order.test.tsx
+  - README.md
+---
+
 # 아키텍처
 
 **분석일:** 2026-10-11  
@@ -6,6 +23,8 @@
 **부분 갱신 (2026-10-11):** 아래 화면 탐색·표시 설명은 현재 작업 트리 기준이다. 나머지 절의 전체 재검증과 커밋 포함을 뜻하지 않으며 기존 매핑 커밋 기준은 유지한다.
 
 **부분 갱신 261011-v9n:** Batch 제거·두 탭·제작 구역에 한해 `819afe7` 기준을 반영했다. 전체 재매핑은 아니다.
+
+**부분 갱신 (2026-10-12, `230a846`):** frontmatter의 `mapped_paths` 중 대사별 생성·제한과 관련 회귀만 갱신했다. 본문의 기존 분석일·전체 매핑 기준은 유지하며 전체 재분석을 뜻하지 않는다.
 
 ## 시스템 개요
 
@@ -33,7 +52,7 @@ Gemini 3.8 REST v1beta → SSE / Voices
 | TTS API | 공유 계약 검증과 PCM HTTP 응답 | `src/app/api/tts/route.ts` |
 | 요청 계약 | 모델·화자·발화·출력·등급 검증 | `src/lib/tts-contract.ts` |
 | REST 경계 | 키 로딩, 크기 제한, 정제 오류, Origin 검사 | `src/lib/gemini-client.ts` |
-| 합성 | 요청 직렬화, SSE, 순차 custom 대화, 취소·제한 재시도 | `src/lib/gemini-tts.ts` |
+| 합성 | 요청 직렬화, SSE, 모든 모드의 대사별 순차 생성, 취소·제한 재시도 | `src/lib/gemini-tts.ts` |
 | Voices | 목소리 목록·생성·조회·삭제 | `src/lib/gemini-voices.ts` |
 | 기능 UI | 편집·목소리 목록/제작·관리 | `src/app/components/TtsEditor.tsx`, `src/app/components/VoiceLibrary.tsx`, `src/app/components/VoiceStudio.tsx` |
 | 오디오 형식 | WAV 검증, G.711, PCM 정규화·다운로드 인코딩 | `src/utils/audio-format.ts` |
@@ -81,7 +100,7 @@ Gemini 3.8 REST v1beta → SSE / Voices
 
 1. `src/app/page.tsx`가 `parseTts`로 요청 snapshot을 검증하고 재생기를 활성화한다.
 2. `src/app/api/tts/route.ts`가 `readJson`·`parseTts`를 실행하고 `openPcm`을 호출한다.
-3. `src/lib/gemini-tts.ts`가 prebuilt 대화를 단일 다중 화자 요청으로, custom 대화를 턴별 순차 요청으로 변환한다.
+3. `src/lib/gemini-tts.ts`가 모든 모드의 원래 대사를 자신의 화자·연출을 유지한 독립 요청으로 사전 계획하고 순차 실행한다. prebuilt 대화는 두 화자 설정, custom 대화는 해당 화자의 single 설정을 유지한다. 직접 API 장문은 grapheme·완전한 태그·공백을 보존하며 분할하고 같은 연출을 반복한다.
 4. SSE를 읽어 종료 사유·Base64·MIME·rate를 검사한다. WAV는 전체 컨테이너 검증 후, L16/G.711은 청크별 PCM으로 전달한다.
 5. `src/app/page.tsx`는 청크 경계를 조립하고 요청 샘플레이트(8/16/24kHz)로 재생한다. 완료 PCM에서 WAV와 선택 형식 다운로드를 만든다.
 
@@ -119,7 +138,9 @@ Gemini 3.8 REST v1beta → SSE / Voices
 - 서버 Route Handler와 브라우저 클라이언트 컴포넌트가 분리된다.
 - REST 키는 요청 시 로드하고 합성에는 요청별 `AbortController`를 사용한다 (`src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`).
 - 브라우저 전송 계약은 PCM16LE mono, 8/16/24kHz다. L16/WAV/μ-law/A-law upstream 출력과 브라우저 내부 형식을 혼동하지 않는다 (`src/utils/audio-format.ts`).
-- 공유 검증은 전체 대본 1,000자·연출 4,000자·화자 2명·발화 20개를 제한한다. 오디오는 32MiB다 (`src/lib/tts-contract.ts`, `src/utils/audio-format.ts`).
+- 화면 대본·연출은 입력칸별 `maxLength={1000}`을 유지하며 자동 조각 편집 UI는 없다. 합산 본문 1,000자·연출 4,000자·20턴 제한은 적용하지 않는다 (`src/app/page.tsx`, `src/app/components/TtsEditor.tsx`).
+- TTS raw JSON·정규화 작업은 1MiB, 화자는 최대 2명, 각 연출은 JavaScript 길이 1,000까지다. 전체 계획은 upstream 호출 전에 검증하며 최대 128개 요청, 각 요청 본문 1,000 code points·wire 18,000 UTF-8 bytes 이하다. 이 앱 예산은 공식 토큰 계산이 아니다 (`src/lib/tts-contract.ts`, `src/lib/gemini-tts.ts`, `src/app/api/tts/route.ts`).
+- 누적 PCM은 32MiB다. 뒤 요청 실패·빈 오디오·잘린 SSE·형식/rate 불일치·용량 초과는 다음 요청과 완성 파일 생성을 막는다. 취소는 대기 중 SSE reader까지 전달한다 (`src/lib/gemini-tts.ts`, `src/app/page.tsx`).
 - `.env.local`은 환경 설정 파일이며 내용은 문서화하지 않는다.
 
 ## 오류 처리

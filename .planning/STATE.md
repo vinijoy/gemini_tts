@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 Phase: 1 of 3 (3.8 기본 합성과 공식 목소리 선택)
 Plan: 0 of TBD in current phase
 Status: Quick implementation complete — product acceptance pending
-Last activity: 2026-10-11 - Completed quick task 261011-v9n: 일괄 생성 제거·제작 UI·두 화자 안내의 사용자 VoiceOver 확인과 재발 방지 기록.
+Last activity: 2026-10-12 — quick task 261012-atd 구현·자동 검증 완료, 실제 VoiceOver·음성 확인 대기
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -93,6 +93,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 | 261011-pgf | 숨은 탭 메뉴·상태 보존 및 사용자 VoiceOver 확인 | 2026-10-11 | 0b51afa | [261011-pgf-hidden-tab-menus](./quick/261011-pgf-hidden-tab-menus/) |
 | 261011-sl3 | 생성 UI 순서 정리 및 사용자 VoiceOver 확인 | 2026-10-11 | 0b51afa | [261011-sl3-ui](./quick/261011-sl3-ui/) |
 | 261011-v9n | 일괄 생성 제거·제작 UI 정리·두 화자 안내; 이번 사용자 VoiceOver 확인 통과 | 2026-10-11 | d0c4505 | [261011-v9n-remove-batch-generation-and-align-voice-](./quick/261011-v9n-remove-batch-generation-and-align-voice-/) |
+| 261012-atd | 대사·연출 독립 요청과 순차 결합; 자동 검증 완료·실기 대기 | 2026-10-12 | 230a846 | [261012-atd-dialogue-chunking](./quick/261012-atd-dialogue-chunking/) |
 
 ## Deferred Items
 
@@ -102,6 +103,6 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ## Session Continuity
 
-Last session: 2026-10-11
-Stopped at: quick 261011-v9n 구현·자동 검사·로컬 커밋 완료. 이번 UI의 사용자 VoiceOver 확인 통과 및 재발 방지 규칙 반영.
-Resume file: .planning/quick/261011-v9n-remove-batch-generation-and-align-voice-/261011-v9n-SUMMARY.md
+Last session: 2026-10-12
+Stopped at: quick 261012-atd 구현·자동 검증 완료; 실제 VoiceOver·음성 확인 대기. 단계 진행률 유지.
+Resume file: .planning/quick/261012-atd-dialogue-chunking/261012-atd-SUMMARY.md
