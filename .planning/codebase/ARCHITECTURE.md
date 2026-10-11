@@ -3,6 +3,8 @@
 **분석일:** 2026-10-11  
 **last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
+**부분 갱신 (2026-10-11):** 아래 화면 탐색·표시 설명은 현재 작업 트리 기준이다. 나머지 절의 전체 재검증과 커밋 포함을 뜻하지 않으며 기존 매핑 커밋 기준은 유지한다.
+
 ## 시스템 개요
 
 ```text
@@ -50,6 +52,19 @@ Gemini 3.8 REST v1beta → SSE / Voices / Batch / JSONL Files
 ## 계층
 
 **프레젠테이션:** `src/app/page.tsx`, `src/app/components/`가 편집·합성·Voices·Batch UI를 소유한다. `src/app/layout.tsx`는 전역 레이아웃이다.
+
+**화면 탐색·상태 보존:**
+- `src/app/page.tsx`는 `음성 만들기`, `목소리 제작·관리`, `일괄 작업` 세 탭을 제공한다. `tablist`/`tab`/`tabpanel`과 `aria-controls`/`aria-labelledby`를 연결하며 선택 탭만 `tabIndex={0}`이다. 좌우 방향키 순환 및 Home/End 이동은 선택과 초점을 함께 변경한다.
+- `src/app/page.tsx`의 세 패널은 `src/app/components/TabPanel.tsx`를 사용한다. `TabPanel`은 상태 소유 컴포넌트를 마운트한 채 비활성 패널에 `hidden`과 `inert`를 적용하고, context로 활성 여부를 전달한다. `TabSelect`는 비활성일 때 `null`을 반환해 네이티브 `select`만 제거한다. 숨김 속성만으로 네이티브 메뉴 노출 방지를 처리하지 않는다. `src/app/components/VoiceStudio.tsx`와 `src/app/components/BatchPanel.tsx`의 초안·첨부 파일·작업 상태는 유지한다.
+- 탭 안의 모든 선택 메뉴는 `src/app/components/TabPanel.tsx`의 `TabSelect`와 부모의 제어형 `value`/`onChange` 상태를 사용한다. `src/app/components/VoiceLibrary.tsx`의 기본 목소리도 `basicVoice`로 보존한다. context 밖의 `TabSelect`는 기본적으로 렌더링한다.
+- `src/app/components/VoiceLibrary.tsx`와 `src/app/components/VoiceStudio.tsx`는 요청 종료 후 초점 복원 전에 대상의 `closest("[hidden], [inert]")`를 확인해 비활성 패널로 초점을 옮기지 않는다.
+- `src/app/page.tsx`의 전역 `role="status"`, `aria-live="polite"` 영역은 패널 밖에 있다. `tts-status` 이벤트를 구독하고 `statusMessage || announcement`를 표시하므로 합성 상태 문구가 우선한다.
+- `src/app/components/VoiceLibrary.tsx`는 `details`의 `onToggle`과 `searchOpen`으로 닫힌 검색 폼만 조건부 언마운트한다. 필터·출처·목록·페이지 토큰은 상위 컴포넌트 상태에 보존한다. 내부 `LocaleSelect`의 지역 `custom` 상태와 필터 값 보존은 구분한다.
+
+**한국어 표시·선택값:**
+- `src/lib/tts-labels.ts`는 모델·출력·처리 등급·목소리·필터·Batch 상태 표시를 제공한다. `src/app/components/TtsEditor.tsx`, `src/app/components/VoiceLibrary.tsx`, `src/app/components/VoiceStudio.tsx`, `src/app/components/BatchPanel.tsx`에서 API 값과 한국어 표시를 분리한다.
+- `src/app/components/LocaleSelect.tsx`는 `src/lib/voice-locale-options.json`의 고정 한국어 언어/지역 이름과 순서를 사용한다. 제공 카탈로그 선택지이며 API 전체 지원 범위의 제한 목록이 아니다. 목록 밖 값은 직접 입력한다. `src/app/components/VoiceLibrary.tsx`의 언어·지역 필터와 `src/app/components/VoiceStudio.tsx`의 제작 언어에 사용한다.
+- `src/app/components/LocaleSelect.tsx`, `src/lib/tts-labels.ts`, `src/lib/voice-locale-options.json`은 확인 시 미추적 파일이다. 코드 확인은 실제 VoiceOver 성공이나 단계 수용 판정의 근거가 아니다.
 
 **API:** `src/app/api/`는 HTTP 어댑터이며 공통 요청 검증·오류 처리와 `src/lib/` 도메인을 호출한다. 외부 응답·ID·경로를 신뢰하지 않고 각 경계에서 검사한다.
 

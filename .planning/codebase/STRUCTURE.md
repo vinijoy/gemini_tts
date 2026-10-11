@@ -3,6 +3,8 @@
 **분석일:** 2026-10-11  
 **last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
+**부분 갱신 (2026-10-11):** 화면 탐색·한국어 표시 관련 작업 트리 구조만 갱신했다. 나머지 절의 전체 재검증을 뜻하지 않으며 기존 매핑 커밋 기준은 유지한다.
+
 ## 디렉터리 배치
 
 ```text
@@ -29,6 +31,14 @@ gemini_tts/
 **`src/lib/`:** `tts-contract.ts`에 공유 타입·런타임 검증, `gemini-client.ts`에 인증·요청/응답 제한·Files 업로드, `gemini-tts.ts`에 REST SSE 합성, `gemini-voices.ts`에 Voices CRUD, `gemini-batches.ts`에 Batch 수명 주기와 결과 조립, `voice-catalog.ts`에 기본 30개·응답 정규화·제공 Markdown 파서를 둔다.
 
 **`src/app/components/`:** `TtsEditor.tsx`는 모델·화자·발화·출력·처리 등급 편집, `VoiceLibrary.tsx`는 기본/확장 음성 선택, `VoiceStudio.tsx`는 설계·복제·조회·삭제, `BatchPanel.tsx`는 제출·목록·상태·결과 UI다.
+
+- `src/app/page.tsx`: `음성 만들기`/`목소리 제작·관리`/`일괄 작업` 탭과 키보드 탐색·전역 상태 알림을 소유하며 세 패널에 `TabPanel`을 사용한다.
+- `src/app/components/TabPanel.tsx`: 활성 context와 `hidden`+`inert`로 부모 상태를 유지하는 `TabPanel`, 비활성 패널의 네이티브 선택 요소만 제거하는 `TabSelect`를 제공한다. 선택값은 부모 제어형 상태에 둔다.
+- `src/app/components/VoiceLibrary.tsx`: 접힌 `details` 안의 검색 폼만 조건부 제거하고 필터·출처 등은 상위 상태에 보존한다.
+- `src/app/components/LocaleSelect.tsx`: 언어/지역 한국어 선택과 목록 밖 직접 입력을 공통 제공한다. `src/app/components/VoiceLibrary.tsx`와 `src/app/components/VoiceStudio.tsx`에서 사용한다.
+- `src/lib/tts-labels.ts`: API 식별값에 대응하는 한국어 모델·목소리·출력·처리 등급·필터·작업 상태 표시를 둔다.
+- `src/lib/voice-locale-options.json`: 제공 카탈로그의 언어/지역 코드와 고정 한국어 이름·순서 데이터다. API 전체 지원 범위의 제한 스키마가 아니다.
+- `src/app/components/LocaleSelect.tsx`, `src/lib/tts-labels.ts`, `src/lib/voice-locale-options.json`은 확인 시 미추적 파일이다.
 
 **`src/app/api/voices/`, `src/app/api/batches/`:** 컬렉션 및 `[id]/route.ts`에 CRUD·관리 요청을, `src/app/api/batches/[id]/results/route.ts`에 결과 회수를 둔다.
 
@@ -58,7 +68,12 @@ Next.js 특수 파일은 `page.tsx`, `layout.tsx`, `route.ts`다. 일반 파일�
 
 ## 새 코드 추가 위치
 
+- 생성 탭 UI 순서: 모델·화자 → 목소리 → 대본·말투·태그·추가 발화 → 출력 → 생성·결과를 DOM과 화면에 동일하게 유지한다. h2 제목으로 구역을 탐색하며 CSS order나 양수 tabindex로 순서를 따로 만들지 않는다. 화자 B 기본 목소리는 기본 목소리 영역에, 추가 발화는 첫 대본 뒤에 둔다. 확장 방식에서는 중복 기본 선택 메뉴를 노출하지 않는다. `src/app/generation-order.test.tsx`의 DOM/Tab 순서·입력 보존과 `src/app/page.test.tsx`의 숨은 메뉴 회귀를 실행한다. 2026-10-11 사용자 VoiceOver 확인은 이 배치에 한하며 새 변경의 실기 확인을 대체하지 않는다.
+
 - 새 화면 기능: 기능별 `src/app/components/`에 두고 `src/app/page.tsx`에서 연결한다. 화면 테스트는 `src/app/page.test.tsx`.
+- 탭 변경: `src/app/page.tsx`의 선택 탭만 탭 순서에 포함하는 패턴, 좌우/Home/End 탐색, 패널 상태 보존과 패널 밖 상태 알림을 유지한다.
+- 탭 안 선택 메뉴 추가: `src/app/components/TabPanel.tsx`의 `TabSelect`를 사용하고 부모에 제어형 `value`/`onChange` 상태를 둔다. 네이티브 메뉴 노출 방지를 `hidden`+`inert`만으로 처리하지 않는다. 비동기 초점 복원은 `src/app/components/VoiceLibrary.tsx`와 `src/app/components/VoiceStudio.tsx`처럼 `[hidden], [inert]` 조상을 검사한다.
+- 공통 한국어 표시: `src/lib/tts-labels.ts`를 사용한다. 언어/지역 UI는 `src/app/components/LocaleSelect.tsx`, 선택값 데이터는 `src/lib/voice-locale-options.json`에 둔다.
 - 새 API: `src/app/api/<name>/route.ts`, 테스트는 같은 디렉터리.
 - 새 오디오 모듈: `src/utils/`, PCM 계약(8/16/24kHz mono 16-bit)을 유지하고 co-located 테스트를 추가한다.
 - 새 Gemini 기능: `src/lib/`에 REST 처리와 같은 위치의 `*.test.ts`를 두고, Route Handler는 입력/응답 경계로 유지한다. 공유 입력은 `src/lib/tts-contract.ts`를 재사용한다.

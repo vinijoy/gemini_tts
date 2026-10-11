@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local agent state and generated documentation graphs
+/.gsd/
+/.serena/
+/docs/graphify-out/
+/.planning/quick/**/*.before
+/.planning/quick/**/*.patch
+/.planning/quick/**/planner-hooks.json
+/.planning/quick/**/gsd-*-skills.txt

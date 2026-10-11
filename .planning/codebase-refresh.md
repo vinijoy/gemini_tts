@@ -47,3 +47,46 @@
 - `STATE.md`, `ROADMAP.md`, `REQUIREMENTS.md`, 기존 그래프와 범위 밖 문서는 갱신하지 않는다.
 
 - 최종 로컬 브라우저 확인 뒤 VoiceLibrary 조회 초점 복원과 globals.css 입력 간격·포커스 경계를 보강했다. 구조는 유지되며 최종 테스트 131개·lint·tsc·build 통과 후 해당 소스 해시를 대조했다.
+
+## 2026-10-11 UI 후속 부분 갱신
+
+- 방식: `gsd-map-codebase --fast --focus arch`, 전담 매퍼 1개로 기존 문서 Update.
+- 대상: `ARCHITECTURE.md`, `STRUCTURE.md`의 화면 구조·한국어 표시 관련 절만 갱신. 다른 영역의 기존 기준은 위 표를 유지한다.
+- 이 부분의 마지막 성공 기준 HEAD: `7548bbd0fc39359751c02cc9b6da2c4e87529a60` + 아래 작업 트리 SHA-256. HEAD에 미커밋 코드가 포함됐다는 뜻은 아니다.
+- native drift는 `last_mapped_commit: null`, `action_required: true`로 루트 파일들을 구조 변화로 반환했다. 변경 없음으로 간주하지 않았고 기존 기록과 실제 UI 경로로 범위를 한정했다. 전체 맵 drift 해소를 주장하지 않는다.
+- `STATE.md`와 `ui-followup.md`에 수정·검증·미수행 범위를 연결했다. 위의 STATE 비수정 기록은 이전 매핑 실행에 한한다. ROADMAP/REQUIREMENTS와 기존 quick 검증 기록은 보존한다.
+
+| UI 검토 경로 | SHA-256 |
+| --- | --- |
+| `src/app/page.tsx` | `82a6d27d7dab7d19255a8ba0f81900b5917c5c2d19c01194b30f07ab6fcee917` |
+| `src/app/components/VoiceLibrary.tsx` | `fb503d6f765265edc557e0459b698f8afa44f4d38d4f0c32ecb4b355bacfe3fa` |
+| `src/app/components/TtsEditor.tsx` | `152496c25d1d3ef418d6379ad0b9d459a70ec3e1dcf10ed7eaefe644fd44bbde` |
+| `src/app/components/VoiceStudio.tsx` | `a4eb42547f6d57024d15a74115180be5d212939f197f2dd99292be4dd2ca2052` |
+| `src/app/components/BatchPanel.tsx` | `fcba349a59eb33dd6ecc9c0eaa0a8a04cf98dadbfe1f66861cec0ea9c8d69e1c` |
+| `src/app/components/LocaleSelect.tsx` | `4f360ed08e47b01e2bc567048a00bc7b1c6969b25b5aa46403c42279a459f532` |
+| `src/lib/tts-labels.ts` | `8a6b0bccbdb8b47200328514803b62ddaa9049400b077a40dc7df92d9cc2271a` |
+| `src/lib/voice-locale-options.json` | `116f9d98d5ccd9adac1a223163f19c57cde632024a98d37468667617463b8f3f` |
+| `src/app/page.test.tsx` | `2115588deef9b340a2da6ca48922dcef93b5cb798dcc1a48dbf35880c96ca620` |
+| `src/app/components/choices.test.tsx` | `3bfd3b3f0ae00860c2dad9bda7cd6737fa375ef641cdcdcc37009aa32e65805b` |
+
+## quick 261011-pgf 숨은 탭 메뉴 부분 갱신
+
+- `gsd-map-codebase --fast --focus arch` Update: ARCHITECTURE.md/STRUCTURE.md에 TabPanel·TabSelect 경계, 제어형 선택 유지, 완료 응답의 숨은 초점 보호를 반영했다. 기존 타 영역 기준은 유지한다.
+- 기준 HEAD는 `7548bbd0fc39359751c02cc9b6da2c4e87529a60`이며 아래 해시는 미커밋 작업 트리 기준이다. 이전 UI 해시보다 이 절이 해당 경로의 최신 기준이다.
+- 새 선택 요소도 탭 내부에서는 TabSelect와 부모 제어형 상태를 사용하도록 STRUCTURE.md 확장 규칙에 기록했다.
+- 전체 144 tests·lint·tsc 및 Safari AX 관찰 결과는 quick 실행 기록에 있다. 후속 사용자 확인으로 이번 탭 사이 메뉴 문제의 VoiceOver 수용은 통과했다. NVDA·앱 전체 수용과 커밋 마감 미완료는 보존한다.
+
+| 경로 | SHA-256 |
+| --- | --- |
+| `src/app/page.tsx` | `08d6962b72a0444ab5c69dd52aef3b3dec3a37cdc3903ddb7b1592385e31fd41` |
+| `src/app/page.test.tsx` | `525821ace9b68d5739b0c3b29ec06401d8e4a3ee06547a3e56b339b123d4de8c` |
+| `src/app/components/TabPanel.tsx` | `8a54c33cf6017e5e9dfea8c5e967501f555a053acdb736bb5b9cfef885c92dd0` |
+| `src/app/components/BatchPanel.tsx` | `36e1aa26b851572de29dd5784c02cf92ec7c6c74d8a3b5a51d1cc31cd6b3d809` |
+| `src/app/components/VoiceStudio.tsx` | `127d023b57eef70925b75232275214d40eebca2b04b057298193a1096be0874e` |
+| `src/app/components/LocaleSelect.tsx` | `bc82c127af3f454bf0a6344429eb275de8b66627d1fb53f60fa399aaf18cf344` |
+| `src/app/components/TtsEditor.tsx` | `4fd5422cb436b9eb0a1f18ea0c6c34dc5459ba129642de897a3a60dbebea6d2f` |
+| `src/app/components/VoiceLibrary.tsx` | `4e3b5fd110118abef5ed3b653597eea41c9c2a158233931de134d9ae5cdeb90e` |
+
+## 2026-10-11 커밋 마감 확인
+
+UI 및 선행 의존 변경은 `0b51afa69c1d7e4653f1a529c71dfdc777d631e8`, API 오류·처리 등급 변경은 `0503cbec13c85b31d3c39cb9667686d42225080c`에 보존했다. 위 작업 트리 해시는 과거 부분 매핑 시점 기록이며 최종 코드 전체 재매핑을 의미하지 않는다. STRUCTURE.md에 사용자 확인된 생성 UI 순서와 회귀 검사 진입점을 보완했다. 생성 순서 변경은 기존 컴포넌트 내부 배치이므로 전체 맵 재생성은 생략했다. 카테고리 탐색·TimedLiveRegion 등 선행 변경의 전반적 맵 동기화는 다음 관련 계획 전 실제 소스를 대조할 보류 범위로 남긴다.
