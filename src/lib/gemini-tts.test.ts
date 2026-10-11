@@ -32,6 +32,12 @@ it("accepts 21 turns and more than 4,000 total style characters",()=>{
  const r=dialogue();r.turns=Array.from({length:21},(_,i)=>({speaker:i%2?"B":"A",text:"대사",style:"s".repeat(220)}));
  expect(requestGroups(parseTts(r)).flat()).toEqual(r.turns);
 });
+it("manual turns stay separate with their own directions even when short",()=>{
+ const r=dialogue();r.turns=r.turns.map(t=>({...t,text:"짧은 대사"}));
+ expect(requestGroups(r)).toEqual(r.turns.map(t=>[t]));
+ const single=dialogue("single");single.turns=[{speaker:"A",text:"a".repeat(1000)+"  ",style:""}];
+ expect(requestGroups(single).flat().map(t=>t.text).join("")).toBe(single.turns[0].text);
+});
 it("preflights oversized directions, voice configuration and 129 custom calls",async()=>{
  const r=dialogue();const calls=vi.fn();vi.stubGlobal("fetch",calls);
  for(const invalid of [{...r,turns:[...r.turns,{speaker:"B",text:"끝",style:"가".repeat(2100)}]}, {...r,speakers:r.speakers.map(s=>({...s,voice:{kind:"prebuilt-id",value:"a".repeat(4096)}}))}, {...dialogue("custom-dialogue"),turns:Array.from({length:129},()=>({speaker:"A",text:"a",style:""}))}]){
