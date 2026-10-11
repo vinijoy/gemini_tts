@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Home from "./page";
+import { POST } from "./api/tts/route";
 
 const player = vi.hoisted(() => ({
   activate: vi.fn<() => Promise<void>>(),
@@ -43,6 +44,23 @@ vi.mock("@/utils/streaming-player", () => ({
 
 let streamController!: ReadableStreamDefaultController<Uint8Array>;
 let streamSettled = false;
+
+it("화면 제출부터 실제 POST와 REST 응답을 거쳐 완료 WAV까지 연결한다", async () => {
+  streamSettled = true;
+  vi.stubGlobal("fetch", vi.fn(async (url, init) => {
+    if (url === "/api/tts") return POST(new Request("http://localhost/api/tts", init));
+    expect(String(url)).toContain("gemini-3.8-flash-tts:streamGenerateContent");
+    const body = JSON.parse(init.body);
+    expect(body.contents[0].parts[0].text).toBe("통합 검사");
+    return new Response('data: {"candidates":[{"content":{"parts":[{"inlineData":{"data":"AQACAA==","mimeType":"audio/l16;rate=24000"}}]},"finishReason":"STOP"}]}\n\n');
+  }));
+  const user=userEvent.setup(); render(<Home />);
+  await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "통합 검사");
+  await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
+  await screen.findByRole("link",{name:"생성된 음성 파일 다운로드"});
+  expect(player.enqueue).toHaveBeenCalledWith(new Int16Array([1,2]));
+  expect(createObjectUrl.mock.calls.at(-1)?.[0].type).toBe("audio/wav");
+});
 
 function closeStream() {
   streamSettled = true;

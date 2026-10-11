@@ -8,6 +8,10 @@ import {
 } from "@/utils/pcm-audio";
 import { StreamingPcmPlayer } from "@/utils/streaming-player";
 
+import TtsEditor, { defaultRequest } from "./components/TtsEditor";
+import { parseTts, VOICE_NAMES, type TtsRequest } from "@/lib/tts-contract";
+import { encodeOutput, MAX_AUDIO_BYTES } from "@/utils/audio-format";
+
 type GenerationStatus = "idle" | "streaming" | "complete";
 
 const DEFAULT_SERVER_ERROR_MESSAGE =
@@ -70,6 +74,9 @@ function createDownloadFileName(voice: string, generatedAt: Date) {
 
 export default function Home() {
   const maxTextLength = 1000;
+  const [options, setOptions] = useState<TtsRequest>(defaultRequest);
+  const [actualTier, setActualTier] = useState("미확인");
+  const completedOutputRef = useRef(defaultRequest.output);
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("Puck");
   const [stylePrompt, setStylePrompt] = useState("");
@@ -95,7 +102,7 @@ export default function Home() {
         ? "음성 생성이 완료되었습니다."
         : "";
 
-  const voices = ["Puck", "Aoede", "Charon", "Kore", "Fenrir"];
+  const voices = VOICE_NAMES;
 
   useEffect(
     () => () => {
@@ -130,6 +137,10 @@ export default function Home() {
       return;
     }
 
+    let snapshot:TtsRequest;
+    try { snapshot=parseTts({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:s.voice.kind==="prebuilt-name"?{kind:"prebuilt-name",value:voice}:s.voice}:s),turns:options.turns.map((t,i)=>i===0?{...t,text,style:stylePrompt}:t)}); } catch(e) {setError(e instanceof Error?e.message:"입력값이 올바르지 않습니다.");return;}
+    completedOutputRef.current=snapshot.output;
+    setActualTier("미확인");
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     replayPromiseRef.current = null;
@@ -158,7 +169,7 @@ export default function Home() {
     let streamCompleted = false;
 
     try {
-      player = new StreamingPcmPlayer();
+      player = new StreamingPcmPlayer(undefined, snapshot.output.sampleRate);
       playerRef.current = player;
       let activation: Promise<
         | { activated: true }
@@ -211,7 +222,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text, voice: generatedVoice, stylePrompt }),
+        body: JSON.stringify(snapshot),
         signal: requestController.signal,
       });
 
@@ -229,11 +240,13 @@ export default function Home() {
         throw new Error(createServerErrorMessage(responseBody));
       }
 
+      setActualTier(response.headers.get("x-gemini-service-tier") || "미확인");
       reader = response.body?.getReader() ?? null;
       if (!reader) throw new Error("음성 스트림을 열 수 없습니다.");
 
       const assembler = new PcmChunkAssembler();
       let playbackStarted = false;
+      let totalBytes=0;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -242,6 +255,8 @@ export default function Home() {
           streamCompleted = true;
           break;
         }
+        totalBytes+=value.length;
+        if(totalBytes>MAX_AUDIO_BYTES) throw new Error("오디오가 앱의 32MiB 제한을 넘은 상태입니다.");
         const samples = assembler.push(value);
         await player.enqueue(samples);
         if (!playbackStarted && samples.length > 0) {
@@ -255,7 +270,7 @@ export default function Home() {
         throw new Error("생성된 오디오 데이터가 없습니다.");
       }
 
-      const url = URL.createObjectURL(createWavBlob(pcmBytes));
+      const url = URL.createObjectURL(createWavBlob(pcmBytes, snapshot.output.sampleRate));
       completedPcmRef.current = pcmBytes;
       audioUrlRef.current = url;
       setAudioUrl(url);
@@ -315,7 +330,7 @@ export default function Home() {
 
     const replay = (async () => {
       const previousPlayer = playerRef.current;
-      replayPlayer = new StreamingPcmPlayer();
+      replayPlayer = new StreamingPcmPlayer(undefined, completedOutputRef.current.sampleRate);
       let activation: Promise<
         | { activated: true }
         | { activated: false; cause: unknown }
@@ -393,7 +408,7 @@ export default function Home() {
       <div className="max-w-2xl w-full bg-white/70 backdrop-blur-md rounded-3xl shadow-xl p-8 border border-white/50">
         <header className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-2">
-            Gemini 3.1 Flash TTS
+            Gemini 3.8 TTS
           </h1>
           <p className="text-sm text-gray-500 font-medium">차세대 AI 텍스트 음성 변환 솔루션</p>
         </header>
@@ -441,7 +456,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 파라미터 조절부 (Gemini 3.1 태그 방식) */}
+          <TtsEditor value={options} onChange={setOptions} disabled={isLoading} />
+          <p>실제 처리 등급: {actualTier === "unknown" ? "미확인" : actualTier}</p>
+          {/* 공식 태그는 대본 원문에 유지한다. */}
           <div className="flex flex-col space-y-2">
             <span className="font-semibold text-gray-700">감정 및 효과 태그 (클릭하여 추가)</span>
             <div className="flex flex-wrap gap-2">
@@ -521,7 +538,7 @@ export default function Home() {
           {/* 결과물 출력부 */}
           {status !== "idle" && (
             <div className="mt-8 p-6 bg-white/80 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center space-y-4">
-              <h2 className="text-lg font-bold text-gray-700">
+              <h2 aria-live="polite" className="text-lg font-bold text-gray-700">
                 {statusMessage}
               </h2>
               <button
@@ -533,6 +550,7 @@ export default function Home() {
               >
                 다시 듣기
               </button>
+              {status === "complete" && <button type="button" onClick={()=>{const pcm=completedPcmRef.current;if(!pcm)return;const result=encodeOutput(pcm,completedOutputRef.current);const url=URL.createObjectURL(new Blob([Uint8Array.from(result.bytes)],{type:result.mime}));const link=document.createElement("a");link.href=url;link.download=downloadFileName.replace(/\.wav$/,"."+result.ext);link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>선택 형식 다운로드</button>}
               {status === "complete" && audioUrl ? (
                 <a
                   href={audioUrl}

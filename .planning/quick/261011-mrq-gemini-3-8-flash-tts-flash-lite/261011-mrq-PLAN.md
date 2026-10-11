@@ -3,7 +3,7 @@ phase: quick-261011-mrq
 plan: "01"
 type: execute
 status: planned
-implementation_authorized: false
+implementation_authorized: true
 wave: 1
 depends_on: []
 autonomous: true
@@ -148,7 +148,8 @@ must_haves:
 </context>
 
 <scope_and_execution>
-- **현재 실행 승인 범위:** 빈이의 최신 지시인 “구현 전까지만 작업해 줘.”에 따라 이 문서와 계획 검증까지만 수행한다. 아래 구현 작업은 후속 명시 요청을 받기 전 실행하지 않는다. 이 계획의 autonomous는 향후 구현 시 내부 승인 반복을 생략한다는 뜻이며 지금 실행을 허가하지 않는다.
+- **2026-10-11 실행 승인 갱신:** 최신 요청 ‘$gsd-quick 아까 새로 작성한 플랜에 따라 구현 시작하자.’에 따라 아래 세 작업의 구현·검증을 승인받았다. 이전 계획 전용 제한은 역사로 보존하며 현재 실행을 차단하지 않는다.
+- **이전 승인 범위(역사):** 빈이의 최신 지시인 “구현 전까지만 작업해 줘.”에 따라 이 문서와 계획 검증까지만 수행한다. 아래 구현 작업은 후속 명시 요청을 받기 전 실행하지 않는다. 이 계획의 autonomous는 향후 구현 시 내부 승인 반복을 생략한다는 뜻이며 지금 실행을 허가하지 않는다.
 - mode=yolo, granularity=coarse, model=inherited. 이 계획은 quick 워크플로의 단일 1–3 작업 계약으로 묶은 세 순차 실행 묶음이다. 각각의 세부 구현은 작은 기능 단위로 진행하고 진행 기록을 남긴다. 일반 단계 계획보다 넓은 범위와 88,000 raw token 예상 비용을 숨기지 않는다. estimate-calibration 결과 factor=1, sample_count=0, confidence=low다.
 - 현재 체크아웃에서 isolation=none, executor_count=1로 수행한다. planner는 소스 수정·설치·API 호출·커밋을 하지 않았다. executor의 작업 단위 커밋 여부는 상위 quick orchestrator 지시를 따른다. main 병합·push·배포는 하지 않는다.
 - 시작 시 git status와 대상 파일 diff를 새로 확인한다. 기존 관찰에서 .gsd/, .serena/, docs/.graphifyignore, docs/graphify-out/가 untracked였다. 이 목록은 보존 근거이며 수정 권한이 아니다. 열거한 구현 경로에도 새 사용자 변경이 있으면 해당 변경을 보존한 최소 diff만 적용한다. 새 이름의 파일이 이미 생겼다면 덮어쓰지 말고 합친다. 상위에서 이미 만든 조사·초기화 자료를 되돌리거나 재작성하지 않는다.

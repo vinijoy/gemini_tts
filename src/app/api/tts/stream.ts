@@ -1,6 +1,4 @@
-import type { GenerateContentResponse } from "@google/genai";
-
-type AudioResponse = Pick<GenerateContentResponse, "candidates">;
+type AudioResponse = {candidates?: {finishReason?: string;content?: {parts?: {inlineData?: {data?: string;mimeType?: string}}[]}}[]};
 
 const BASE64_PATTERN =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;

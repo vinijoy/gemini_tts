@@ -1,0 +1,21 @@
+export const MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"] as const;
+export const VOICE_NAMES = ["Zephyr","Puck","Charon","Kore","Fenrir","Leda","Orus","Aoede","Callirrhoe","Autonoe","Enceladus","Iapetus","Umbriel","Algieba","Despina","Erinome","Algenib","Rasalgethi","Laomedeia","Achernar","Alnilam","Schedar","Gacrux","Pulcherrima","Achird","Zubenelgenubi","Vindemiatrix","Sadachbia","Sadaltager","Sulafat"];
+export const ENCODINGS = ["AUDIO_L16","AUDIO_WAV","AUDIO_MULAW","AUDIO_ALAW"] as const;
+export type VoiceRef = {kind:"prebuilt-name"|"prebuilt-id"|"stored-custom"|"ephemeral-replica";value:string};
+export type TtsRequest = {model:typeof MODELS[number];mode:"single"|"prebuilt-dialogue"|"custom-dialogue";speakers:{id:string;voice:VoiceRef}[];turns:{speaker:string;text:string;style:string}[];output:{encoding:typeof ENCODINGS[number];sampleRate:number};serviceTier:"standard"|"flex"|"priority"};
+export class AppError extends Error { constructor(public status:number,message:string,public retryAfterMs:number|null=null){super(message);} }
+export function object(value:unknown):Record<string,unknown> { if(!value || typeof value!=="object" || Array.isArray(value)) throw new AppError(400,"요청 형식이 올바르지 않습니다."); return value as Record<string,unknown>; }
+export function string(value:unknown,max:number,label:string,empty=false):string { if(typeof value!=="string" || (!empty&&!value.trim()) || value.length>max) throw new AppError(400,`${label} 값이 없거나 앱 제한을 벗어난 상태입니다.`);return value; }
+export function resourceId(value:unknown):string { const id=string(value,256,"식별자");if(!/^[a-zA-Z0-9_-]+$/.test(id))throw new AppError(400,"식별자 형식이 올바르지 않습니다.");return id; }
+export function parseTts(value:unknown):TtsRequest {
+  let b=object(value);
+  if(!b.turns && "text" in b) b={model:MODELS[0],mode:"single",speakers:[{id:"A",voice:{kind:"prebuilt-name",value:b.voice||"Puck"}}],turns:[{speaker:"A",text:b.text,style:b.stylePrompt??""}],output:{encoding:"AUDIO_L16",sampleRate:24000},serviceTier:"standard"};
+  if(!MODELS.includes(b.model as TtsRequest["model"]) || !["single","prebuilt-dialogue","custom-dialogue"].includes(String(b.mode)) || !["standard","flex","priority"].includes(String(b.serviceTier))) throw new AppError(400,"모델·화자 모드·처리 등급이 올바르지 않습니다.");
+  if(!Array.isArray(b.speakers)||b.speakers.length<1||b.speakers.length>2||!Array.isArray(b.turns)||b.turns.length<1||b.turns.length>20)throw new AppError(400,"화자는 최대 2명, 발화는 최대 20개인 앱 제한입니다.");
+  const speakers=b.speakers.map(s=>{const row=object(s), v=object(row.voice);const id=string(row.id,40,"화자");if(!/^[\p{L}\p{N}_-]+$/u.test(id))throw new AppError(400,"화자 이름 형식이 올바르지 않습니다.");const kind=v.kind as VoiceRef["kind"];const val=string(v.value,4096,"목소리");if(!["prebuilt-name","prebuilt-id","stored-custom","ephemeral-replica"].includes(kind)|| (kind==="prebuilt-name"&&!VOICE_NAMES.includes(val))|| (kind!=="prebuilt-name"&&!/^[A-Za-z0-9_./+=-]+$/.test(val)))throw new AppError(400,"목소리 참조가 올바르지 않습니다.");return {id,voice:{kind,value:val}};});
+  if(new Set(speakers.map(s=>s.id)).size!==speakers.length || (b.mode==="single"&&speakers.length!==1)|| (b.mode!=="single"&&speakers.length!==2)|| (b.mode==="prebuilt-dialogue"&&speakers.some(s=>!s.voice.kind.startsWith("prebuilt"))))throw new AppError(400,"화자 구성과 모드가 일치하지 않습니다.");
+  const turns=b.turns.map(t=>{const row=object(t);const speaker=string(row.speaker,40,"발화 화자");if(!speakers.some(s=>s.id===speaker))throw new AppError(400,"등록되지 않은 발화 화자입니다.");return {speaker,text:string(row.text,1000,"대본"),style:string(row.style??"",1000,"연출",true)};});
+  if(turns.reduce((n,t)=>n+t.text.length,0)>1000||turns.reduce((n,t)=>n+t.style.length,0)>4000)throw new AppError(400,"전체 대본 1,000자·전체 연출 4,000자인 앱 제한을 넘은 상태입니다.");
+  const o=object(b.output);if(!ENCODINGS.includes(o.encoding as TtsRequest["output"]["encoding"])||![8000,16000,24000].includes(Number(o.sampleRate))||typeof o.sampleRate!=="number")throw new AppError(400,"출력 형식 또는 샘플레이트가 올바르지 않습니다.");
+  return {model:b.model as TtsRequest["model"],mode:b.mode as TtsRequest["mode"],speakers,turns,output:{encoding:o.encoding as TtsRequest["output"]["encoding"],sampleRate:o.sampleRate},serviceTier:b.serviceTier as TtsRequest["serviceTier"]};
+}

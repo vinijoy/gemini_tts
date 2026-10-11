@@ -1,0 +1,6 @@
+import { expect,it } from "vitest";
+import { decodeAudio, decodeG711, encodeG711, parseWav, wavBytes } from "./audio-format";
+it.each([8000,16000,24000])("WAV preserves rate %i and samples",rate=>{const pcm=new Uint8Array([0,0,255,127,0,128]);const wav=wavBytes(pcm,rate);expect(parseWav(wav)).toEqual({pcm,sampleRate:rate,duration:3/rate});expect(()=>parseWav(wav.slice(0,-1))).toThrow();});
+it("RIFF reads padded metadata before fmt/data",()=>{const wav=wavBytes(new Uint8Array([1,0]),24000);const full=new Uint8Array(wav.length+10);full.set(wav.subarray(0,12));full.set([74,85,78,75,1,0,0,0,9,0],12);full.set(wav.subarray(12),22);new DataView(full.buffer).setUint32(4,full.length-8,true);expect(parseWav(full).pcm).toEqual(new Uint8Array([1,0]));});
+it.each([true,false])("G.711 known zero and signed fixtures: alaw=%s",alaw=>{const bytes=new Uint8Array(alaw?[0xd5,0x55,0xaa,0x2a]:[0xff,0x7f,0x80,0x00]);const pcm=decodeG711(bytes,alaw);const v=new DataView(pcm.buffer);expect(v.getInt16(4,true)).toBeGreaterThan(30000);expect(v.getInt16(6,true)).toBeLessThan(-30000);expect(decodeG711(encodeG711(pcm,alaw),alaw)).toEqual(pcm);});
+it("rejects MIME, channels and rate mismatch",()=>{for(const mime of ["audio/wav","audio/l16;rate=8000","audio/l16;channels=2"])expect(()=>decodeAudio(new Uint8Array([0,0]),mime,{encoding:"AUDIO_L16",sampleRate:24000})).toThrow();});
