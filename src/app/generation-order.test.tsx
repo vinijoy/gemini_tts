@@ -61,14 +61,28 @@ it("대화 목소리는 함께 선택하고 추가 발화는 첫 대본 다음�
 });
 
 
-it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 두 화자 대화와 자동 분할·연출 보존을 설명한다", async (mode) => {
+it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 한 칸의 두 화자와 칸별 연출을 설명한다", async (mode) => {
   const user = userEvent.setup();
   render(<Home />);
   expect(screen.queryByRole("button", {name: "대사 추가"})).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("화자 모드"), mode);
-  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("각 대사는 지정한 연출로 따로 생성합니다.");
+  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("각 칸의 연출은 그 안의 모든 발화에 적용됩니다.");
   expect(screen.queryByText(/첫 발화는 위 대본과 연출|위의 대본과 말투는 첫 번째 화자/)).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", {name: "대사 추가"}));
   expect(screen.getByLabelText("발화 2 화자")).toHaveValue("B");
   expect(screen.getByLabelText("발화 2 대본")).toBeVisible();
+});
+it("화자 이름은 선택 모드 뒤에서 탐색하며 탭·모델·화자 모드 왕복에도 유지된다",async()=>{
+ const user=userEvent.setup();render(<Home/>);
+ expect(screen.queryByLabelText("첫 번째 화자 대본 이름")).not.toBeInTheDocument();
+ await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
+ const first=screen.getByLabelText("첫 번째 화자 대본 이름"),second=screen.getByLabelText("두 번째 화자 대본 이름");
+ expect(first).toHaveValue("");expect(second).toHaveValue("");await user.type(first,"별하");await user.type(second,"도윤");
+ expectOrder([screen.getByLabelText("화자 모드"),first,second,screen.getByLabelText("음성 선택")]);
+ first.focus();await user.tab();expect(second).toHaveFocus();
+ await user.selectOptions(screen.getByLabelText("모델"),"gemini-3.8-flash-lite-tts");
+ await user.selectOptions(screen.getByLabelText("음성 선택"),"Aoede");
+ await user.selectOptions(screen.getByLabelText("화자 모드"),"single");await user.selectOptions(screen.getByLabelText("화자 모드"),"custom-dialogue");
+ await user.click(screen.getByRole("tab",{name:"목소리 제작·관리"}));await user.click(screen.getByRole("tab",{name:"음성 만들기"}));
+ expect(screen.getByLabelText("첫 번째 화자 대본 이름")).toHaveValue("별하");expect(screen.getByLabelText("두 번째 화자 대본 이름")).toHaveValue("도윤");
 });

@@ -266,6 +266,15 @@ it("두 대화 상자 안의 이름을 각각 설정한 목소리로 보내고 �
  for(const wire of wires)expect(wire.generationConfig.speechConfig.multiSpeakerVoiceConfig.speakerVoiceConfigs).toEqual([{speaker:"A",voiceConfig:{voice:"Puck"}},{speaker:"B",voiceConfig:{voice:"Kore"}}]);
  expect(player.enqueue.mock.calls.flatMap(([samples])=>Array.from(samples))).toEqual([1,2]);expect(createObjectUrl.mock.calls.at(-1)?.[0].type).toBe("audio/wav");
 });
+it("뒤 칸의 미등록 이름은 생성 전에 알려 주고 대본을 유지한다",async()=>{
+ streamSettled=true;vi.spyOn(console,"error").mockImplementation(()=>{});
+ const provider=vi.fn();vi.stubGlobal("fetch",vi.fn((url,init)=>url==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):provider(url,init)));
+ const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"A: 첫 대사\nB: 다음 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));
+ fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"미등록: 뒤 대사"}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
+ expect(await screen.findByRole("alert")).toHaveTextContent("2번째 대사의 ‘미등록’은 화자 대본 이름에 등록되지 않은 이름입니다. 화자 이름 설정을 확인하세요.");
+ expect(screen.getByLabelText("발화 2 대본")).toHaveValue("미등록: 뒤 대사");expect(provider).not.toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();
+});
 function errorStream(error: Error) {
     streamSettled = true;
     streamController.error(error);
