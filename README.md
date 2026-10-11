@@ -28,15 +28,7 @@
 
 공식 목록과 조회 상태는 [GEMINI-TTS-VOICES.md](GEMINI-TTS-VOICES.md)에 있습니다. 사용자가 다른 프로젝트에서 제공한 2026-10-01 목록 2,089개(한국어 117개)를 원문 그대로 보존하며 앱의 ‘사용자 제공 목록’에서 검색·선택할 수 있습니다. 현재 서버 키의 2026-10-11 실제 GET은 HTTP 400 / INVALID_ARGUMENT / API_KEY_INVALID였으므로 현재 계정의 전수 조회·합성 접근 검증은 미완료입니다. 제공 목록의 과거 수집과 현재 키 접근은 별개입니다. 원문 안의 다른 프로젝트 기본 음성 지시는 이 앱 설정으로 적용하지 않습니다.
 
-## Batch 작업
-
-현재 대본을 항목으로 담아 명시 제출합니다. 한 작업의 모든 항목은 같은 TTS 모델을 사용합니다. 인라인 제출 또는 검증한 항목을 JSONL 파일로 업로드한 뒤 Files resource로 제출하는 방식을 선택합니다. 두 방식 모두 최대 20개·UTF-8 1MiB 앱 제한을 적용하며 공식 inline 20MB/파일 2GB 한도 전체를 노출하지 않습니다. 임의 기존 Files ID·임의 URL·외부 JSONL을 무검증 제출하는 기능은 없습니다.
-
-작업 이름 `batches/...`를 복사해 보관하면 다시 열 수 있습니다. 목록/페이지, 수동 새로고침과 30초 polling을 지원합니다. SUCCEEDED/FAILED/CANCELLED/EXPIRED에서 polling을 멈춥니다. 패널을 닫으면 polling만 중단되며 원격 작업을 취소하지 않습니다. 취소는 별도 확인 버튼이며 POST 성공만으로 취소 완료라고 표시하지 않습니다. 삭제와 내부 정수 priority 변경도 명시 동작입니다. 내부 priority는 Standard/Flex/Priority 서비스 등급과 다릅니다.
-
-성공한 작업의 inline 결과 또는 공식 Files JSONL 결과를 최대 32MiB로 회수합니다. key로 항목과 발화 순서를 복원하며 개별 실패·누락을 표시합니다. 모든 발화가 성공한 그룹만 WAV 재생/저장을 제공합니다. 실패 항목을 자동 유료 재제출하지 않습니다. Files 업로드 뒤 제출 응답이 유실되면 중복 제출 전에 목록을 확인해야 합니다.
-
-**Webhook 알림은 미구현입니다.** 현재 로컬 앱에는 공개 수신 endpoint·서명 검증 인프라가 없으며 외부 알림을 등록하지 않습니다. 사용자 전체 기능 요청에서 남은 범위로 추적하며 지원 완료나 승인된 제외로 간주하지 않습니다.
+일괄 생성 기능은 2026-10-11 사용자 요청으로 제거했습니다. 현재 앱은 음성 만들기와 목소리 제작·관리 두 탭을 제공합니다.
 
 ## 검증과 제한
 
@@ -48,6 +40,6 @@ npm run build
 node scripts/generate-voice-catalog.mjs
 ```
 
-마지막 명령만 인증된 공식 prebuilt GET을 실행하고 별도 GEMINI-TTS-VOICES.generated.md를 생성합니다. 사용자 제공 GEMINI-TTS-VOICES.md를 덮어쓰지 않습니다. 생성·복제·Batch 제출·삭제는 하지 않습니다. 자동 검사는 모의 응답을 사용합니다. 실제 유료 합성·복제·Batch, 한국어 발화 품질·태그 효과·화자 구별, 계정 권한·실제 등급, VoiceOver/NVDA는 별도 미수행입니다. API가 구현됐다는 사실이 실제 계정 가용성을 보장하지 않습니다.
+마지막 명령만 인증된 공식 prebuilt GET을 실행하고 별도 GEMINI-TTS-VOICES.generated.md를 생성합니다. 사용자 제공 GEMINI-TTS-VOICES.md를 덮어쓰지 않습니다. 생성·복제·삭제는 하지 않습니다. 자동 검사는 모의 응답을 사용합니다. 실제 유료 합성·복제, 한국어 발화 품질·태그 효과·화자 구별, 계정 권한·실제 등급, VoiceOver/NVDA는 별도 미수행입니다. API가 구현됐다는 사실이 실제 계정 가용성을 보장하지 않습니다.
 
 공식 근거는 `docs/google-gemini/`, `docs/google-genai/`, `docs/nextjs/`에 보관합니다. 기능별 근거·검사·남은 범위는 `.planning/quick/261011-mrq-gemini-3-8-flash-tts-flash-lite/261011-mrq-VERIFICATION.md`와 `COVERAGE.md`에서 관리합니다. 기존 로드맵 요구사항과 단계 수용은 이 quick 구현으로 완료 처리하지 않습니다.

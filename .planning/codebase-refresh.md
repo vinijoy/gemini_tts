@@ -90,3 +90,11 @@
 ## 2026-10-11 커밋 마감 확인
 
 UI 및 선행 의존 변경은 `0b51afa69c1d7e4653f1a529c71dfdc777d631e8`, API 오류·처리 등급 변경은 `0503cbec13c85b31d3c39cb9667686d42225080c`에 보존했다. 위 작업 트리 해시는 과거 부분 매핑 시점 기록이며 최종 코드 전체 재매핑을 의미하지 않는다. STRUCTURE.md에 사용자 확인된 생성 UI 순서와 회귀 검사 진입점을 보완했다. 생성 순서 변경은 기존 컴포넌트 내부 배치이므로 전체 맵 재생성은 생략했다. 카테고리 탐색·TimedLiveRegion 등 선행 변경의 전반적 맵 동기화는 다음 관련 계획 전 실제 소스를 대조할 보류 범위로 남긴다.
+
+
+## 261011-v9n 최신 부분 기준
+
+- gsd-map-codebase --fast --focus tech+arch, 승인된 Update를 coordinator가 직접 적용했다. ARCHITECTURE/STRUCTURE/STACK/INTEGRATIONS 네 문서의 일괄 API·Files 업로드 제거와 두 탭·제작 구역만 갱신했다. 해당 범위는 819afe7 기준이며 위의 Batch 경로/해시는 과거 기록이다.
+- native codebase-drift는 last_mapped_commit=null인 상태에서 루트 파일 9개를 structural로 보고했다. 이를 전체 맵 최신화 근거로 쓰지 않고 이번 실제 삭제와 호출부를 대조했다.
+- 키 우선순위 설명은 현재 gemini-client의 환경 변수 우선 동작과 일치시켰다. 다른 선행 UI 맵 보류 및 비대상 문서 기준은 그대로 둔다.
+- 생성 안내 문구 변경은 기존 컴포넌트 내부이며 구조 재분석 대상이 아니다. 실제 기록과 검사는 261011-v9n SUMMARY를 따른다.

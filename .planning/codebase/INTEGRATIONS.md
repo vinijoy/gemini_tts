@@ -3,6 +3,8 @@
 **분석 날짜:** 2026-10-11  
 **last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
+**부분 갱신 261011-v9n:** Batch 제거·두 탭·제작 구역에 한해 `819afe7` 기준을 반영했다. 전체 재매핑은 아니다.
+
 ## API 및 외부 서비스
 
 **음성 합성:**
@@ -20,16 +22,11 @@
 - 제공 원문은 2026-10-01 다른 프로젝트 목록이며 2,089개(한국어 117개)다. 문서의 운영 지시는 실행 규칙으로 사용하지 않는다. 현재 키의 HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`는 부모 실행 보고이며 제공 데이터·합성 권한과 별개다.
 - `scripts/generate-voice-catalog.mjs`는 공개 prebuilt 목록을 페이지별 수집하고 중복·반복 토큰을 검사하여 `GEMINI-TTS-VOICES.generated.md`를 쓴다. 사용자 제공 `GEMINI-TTS-VOICES.md` 원문은 덮어쓰지 않는다. 실패 시 미완료와 기본 fallback을 표시한다. custom 자산·키·녹음은 출력 필드에 포함하지 않는다.
 
-**Batch 및 Files:**
-- `models/{model}:batchGenerateContent`, `batches` 목록/조회/취소/삭제, `:updateGenerateContentBatch?updateMask=priority`를 사용한다 (`src/lib/gemini-batches.ts`).
-- 검증된 항목을 inline 또는 생성된 JSONL로 제출한다. 파일 방식은 `/upload/v1beta/files` resumable start → upload/finalize → 반환된 `files/{id}` 참조 순서다 (`src/lib/gemini-client.ts`).
-- 업로드 URL은 고정 Google origin·경로를 검증하며 redirect를 허용하지 않는다. 결과는 inline 또는 검증한 `files/{id}`의 `/download/v1beta/...:download?alt=media`에서 회수한다.
-- 새 Batch 키는 `tts-v2-{전체그룹수}-{group}-{order}-{발화수}-{rate}-{encoding}`다. inline·Files 결과 모두 그룹 전체 누락과 턴 누락을 확인하며 빈 결과를 거부한다. `tts-v1` 결과 파싱은 유지한다 (`src/lib/gemini-batches.ts`).
-- 최대 20개(사용자 지정 대화 턴 확장 후 포함), 1MiB 입력, 32MiB 결과 오디오 제한이다. 비저장 복제 키는 Batch에 제출하지 않는다 (`src/lib/gemini-batches.ts`).
+일괄 생성 및 JSONL Files 업로드 연동은 2026-10-11 사용자 요청으로 제거했다. 원격 자산의 삭제·취소는 실행하지 않았다.
 
 ## 데이터 저장
 
-**데이터베이스:** 앱 DB·ORM은 없다. Batch·저장형 음성·JSONL 입력 파일은 Gemini 측 자산이다 (`src/lib/gemini-batches.ts`, `src/lib/gemini-voices.ts`).
+**데이터베이스:** 앱 DB·ORM은 없다. 저장형 목소리는 Gemini 측 자산이다 (`src/lib/gemini-voices.ts`).
 
 **파일 저장:** 브라우저는 PCM·WAV Blob/object URL을 임시 보관한다. 선택 형식 다운로드는 `encodeOutput`을 사용한다 (`src/app/page.tsx`, `src/utils/audio-format.ts`). 로컬 제공 카탈로그 Markdown을 읽으며 수집기는 공개 목록 Markdown을 생성할 수 있다 (`scripts/generate-voice-catalog.mjs`).
 
@@ -37,7 +34,7 @@
 
 ## 인증 및 사용자 식별
 
-`GEMINI_API_KEY`를 서버의 `x-goog-api-key` 헤더로 전달한다. `src/lib/gemini-client.ts`는 환경 변수와 로컬 환경 파일을 읽으며 파일 값이 있으면 우선한다. 사용자 로그인·세션은 없다. Origin/Sec-Fetch-Site 검사로 교차 사이트 변경 요청을 거부하지만 사용자 인증을 대체하지 않는다.
+`GEMINI_API_KEY`를 서버의 `x-goog-api-key` 헤더로 전달한다. `src/lib/gemini-client.ts`는 환경 변수를 우선 사용하고 없을 때 로컬 환경 파일을 읽는다. 사용자 로그인·세션은 없다. Origin/Sec-Fetch-Site 검사로 교차 사이트 변경 요청을 거부하지만 사용자 인증을 대체하지 않는다.
 
 ## 모니터링 및 관측성
 
@@ -59,7 +56,7 @@
 
 ## 웹훅 및 콜백
 
-**수신:** webhook 수신 엔드포인트는 구현되어 있지 않다. `src/app/components/BatchPanel.tsx`가 종료 전 30초마다 GET 상태 조회를 수행한다.
+**수신:** webhook 수신 엔드포인트는 구현되어 있지 않다.
 
 **송신:** 서버가 고정 Gemini origin에 요청하며 별도 앱 콜백 전송은 없다 (`src/lib/gemini-client.ts`).
 
@@ -69,7 +66,7 @@
 - prebuilt 대화는 다중 화자 요청, custom 대화는 발화별 순차 요청이다 (`src/lib/gemini-tts.ts`).
 - 네 가지 upstream 출력(L16/WAV/μ-law/A-law)은 mono PCM16LE로 정규화해 브라우저에 보낸다. 샘플레이트는 8/16/24kHz이며 WAV는 완성된 컨테이너를 검증한 뒤 PCM을 전달한다 (`src/utils/audio-format.ts`, `src/lib/gemini-tts.ts`).
 - 분당 429의 명시된 1~65초 retry delay 또는 finishReason OTHER는 첫 오디오 전에 1회 재시도한다. 일일 한도와 오디오 전송 이후 실패는 재시도하지 않는다 (`src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`).
-- Voice Remix는 base_voice 계약 미확인으로 UI에서 차단된다 (`src/app/components/VoiceStudio.tsx`). 유료 합성·제작·Batch 및 실제 스크린리더 검증 결과를 이 맵은 보증하지 않는다.
+- Voice Remix는 base_voice 계약 미확인으로 UI에서 차단된다 (`src/app/components/VoiceStudio.tsx`). 유료 합성·제작 및 실제 스크린리더 검증 결과를 이 맵은 보증하지 않는다.
 
 ---
 

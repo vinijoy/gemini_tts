@@ -5,12 +5,14 @@
 
 **부분 갱신 (2026-10-11):** 화면 탐색·한국어 표시 관련 작업 트리 구조만 갱신했다. 나머지 절의 전체 재검증을 뜻하지 않으며 기존 매핑 커밋 기준은 유지한다.
 
+**부분 갱신 261011-v9n:** Batch 제거·두 탭·제작 구역에 한해 `819afe7` 기준을 반영했다. 전체 재매핑은 아니다.
+
 ## 디렉터리 배치
 
 ```text
 gemini_tts/
 ├── src/app/                 # App Router 페이지·레이아웃·스타일
-│   └── api/                 # Route Handler (`health`, `tts`, `voices`, `batches`)
+│   └── api/                 # Route Handler (`health`, `tts`, `voices`)
 ├── src/lib/                 # Gemini REST·공유 입력 계약·카탈로그 정규화
 ├── scripts/                 # 공개 목소리 카탈로그 수집기
 ├── src/utils/               # PCM/WAV 변환·Web Audio 재생
@@ -28,19 +30,19 @@ gemini_tts/
 
 **`src/app/api/tts/`:** `route.ts`는 검증·REST 합성 모듈을 호출하는 얇은 HTTP 어댑터다. `stream.ts`와 해당 테스트는 남아 있으나 현재 `route.ts`의 REST 실행 경로는 `src/lib/gemini-tts.ts`다.
 
-**`src/lib/`:** `tts-contract.ts`에 공유 타입·런타임 검증, `gemini-client.ts`에 인증·요청/응답 제한·Files 업로드, `gemini-tts.ts`에 REST SSE 합성, `gemini-voices.ts`에 Voices CRUD, `gemini-batches.ts`에 Batch 수명 주기와 결과 조립, `voice-catalog.ts`에 기본 30개·응답 정규화·제공 Markdown 파서를 둔다.
+**`src/lib/`:** `tts-contract.ts`에 공유 타입·런타임 검증, `gemini-client.ts`에 인증·요청/응답 제한, `gemini-tts.ts`에 REST SSE 합성, `gemini-voices.ts`에 Voices CRUD, `voice-catalog.ts`에 기본 30개·응답 정규화·제공 Markdown 파서를 둔다.
 
-**`src/app/components/`:** `TtsEditor.tsx`는 모델·화자·발화·출력·처리 등급 편집, `VoiceLibrary.tsx`는 기본/확장 음성 선택, `VoiceStudio.tsx`는 설계·복제·조회·삭제, `BatchPanel.tsx`는 제출·목록·상태·결과 UI다.
+**`src/app/components/`:** `TtsEditor.tsx`는 모델·화자·발화·출력·처리 등급 편집, `VoiceLibrary.tsx`는 기본/확장 음성 선택, `VoiceStudio.tsx`는 설계·복제·조회·삭제를 담당한다.
 
-- `src/app/page.tsx`: `음성 만들기`/`목소리 제작·관리`/`일괄 작업` 탭과 키보드 탐색·전역 상태 알림을 소유하며 세 패널에 `TabPanel`을 사용한다.
+- `src/app/page.tsx`: `음성 만들기`/`목소리 제작·관리` 두 탭과 키보드 탐색·전역 상태 알림을 소유하며 두 패널에 `TabPanel`을 사용한다.
 - `src/app/components/TabPanel.tsx`: 활성 context와 `hidden`+`inert`로 부모 상태를 유지하는 `TabPanel`, 비활성 패널의 네이티브 선택 요소만 제거하는 `TabSelect`를 제공한다. 선택값은 부모 제어형 상태에 둔다.
 - `src/app/components/VoiceLibrary.tsx`: 접힌 `details` 안의 검색 폼만 조건부 제거하고 필터·출처 등은 상위 상태에 보존한다.
 - `src/app/components/LocaleSelect.tsx`: 언어/지역 한국어 선택과 목록 밖 직접 입력을 공통 제공한다. `src/app/components/VoiceLibrary.tsx`와 `src/app/components/VoiceStudio.tsx`에서 사용한다.
-- `src/lib/tts-labels.ts`: API 식별값에 대응하는 한국어 모델·목소리·출력·처리 등급·필터·작업 상태 표시를 둔다.
+- `src/lib/tts-labels.ts`: API 식별값에 대응하는 한국어 모델·목소리·출력·처리 등급·필터 표시를 둔다.
 - `src/lib/voice-locale-options.json`: 제공 카탈로그의 언어/지역 코드와 고정 한국어 이름·순서 데이터다. API 전체 지원 범위의 제한 스키마가 아니다.
-- `src/app/components/LocaleSelect.tsx`, `src/lib/tts-labels.ts`, `src/lib/voice-locale-options.json`은 확인 시 미추적 파일이다.
+- `src/app/components/LocaleSelect.tsx`, `src/lib/tts-labels.ts`, `src/lib/voice-locale-options.json`은 현재 Git에 추적되는 파일이다.
 
-**`src/app/api/voices/`, `src/app/api/batches/`:** 컬렉션 및 `[id]/route.ts`에 CRUD·관리 요청을, `src/app/api/batches/[id]/results/route.ts`에 결과 회수를 둔다.
+**`src/app/api/voices/`:** 컬렉션 및 `[id]/route.ts`에 목소리 목록·생성·조회·삭제 요청을 둔다.
 
 **`GEMINI-TTS-VOICES.md`:** 사용자 제공 2026-10-01 공개 목록 원문. `src/lib/gemini-voices.ts`의 `source=provided` 검색이 읽는다. 현재 프로젝트 키의 실서비스 검증 증거로 쓰지 않는다.
 
@@ -52,13 +54,15 @@ gemini_tts/
 
 **`docs/`:** `docs/nextjs/` 프레임워크 문서, `docs/superpowers/` 설계·계획, `docs/graphify-out/` 그래프 산출물이다.
 
+목소리 제작 화면은 다섯 h2와 이름 있는 section으로 구성한다. 제작 설정 → 정보 → 설명/녹음·동의 → 생성·결과 → 저장 관리 순서다. 이번 신규 배치의 사용자 VoiceOver 확인은 대기 중이며 `ui-followup.md`를 따른다.
+
 ## 주요 파일 위치
 
 **진입점:** `src/app/page.tsx` (`/`), `src/app/api/tts/route.ts` (`POST /api/tts`), `src/app/api/health/route.ts` (`GET /api/health`), `src/app/layout.tsx` (전역 레이아웃).
 
 **설정:** `package.json`, `next.config.ts`, `tsconfig.json`, `vitest.config.ts`, `eslint.config.mjs`.
 
-**핵심 로직:** `src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`.
+**핵심 로직:** `src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`.
 
 **테스트:** `src/app/page.test.tsx`, `src/app/api/tts/route.test.ts`, `src/app/api/tts/stream.test.ts`, `src/app/api/health/route.test.ts`, `src/utils/pcm-audio.test.ts`, `src/utils/streaming-player.test.ts`.
 

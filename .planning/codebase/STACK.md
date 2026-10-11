@@ -3,6 +3,8 @@
 **분석 날짜:** 2026-10-11  
 **last_mapped_commit:** `c49f74b5251782cd41f2a5daa29b611785b7de89`
 
+**부분 갱신 261011-v9n:** Batch 제거·두 탭·제작 구역에 한해 `819afe7` 기준을 반영했다. 전체 재매핑은 아니다.
+
 ## 언어
 - TypeScript 5 계열 - `src/`의 Next.js 애플리케이션, API 라우트, 오디오 처리와 테스트
 - CSS - `src/app/globals.css`
@@ -18,12 +20,12 @@
 - Vitest `^4.1.10`, Testing Library, jsdom - 테스트 (`vitest.config.ts`)
 
 ## 주요 의존성
-- `@google/genai` `2.28.0` 정확한 버전 고정 (`package.json`). 현재 TTS·Voices·Batch 전송은 서버 REST `fetch` 계층을 사용한다 (`src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`).
+- `@google/genai` `2.28.0` 정확한 버전 고정 (`package.json`). 현재 TTS·Voices 전송은 서버 REST `fetch` 계층을 사용한다 (`src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`).
 - TypeScript `^5`, ESLint `^9.39.5`, `eslint-config-next` `16.2.12` - 타입 검사와 린트
 - `pm2` - 별도 선언 없이 `npx pm2`로 운영 프로세스 관리 (`package.json`)
 
 ## 설정
-- `GEMINI_API_KEY`를 Gemini 인증에 사용하며 `.env.local`이 있으면 서버 라우트가 읽음 (`src/lib/gemini-client.ts`). 환경 파일이 있으면 요청별로 읽어 환경 변수보다 우선하며, 값은 기록하지 않음.
+- `GEMINI_API_KEY`를 Gemini 인증에 사용하며 `.env.local`이 있으면 서버 라우트가 읽음 (`src/lib/gemini-client.ts`). 환경 변수가 없을 때만 로컬 파일을 읽으며, 값은 기록하지 않음.
 - `next.config.ts`: `allowedDevOrigins`, `devIndicators`, `outputFileTracingRoot`
 - `tsconfig.json`: strict, noEmit, bundler 해석, `@/*` → `./src/*`
 - `vitest.config.ts`: Node와 jsdom 테스트 프로젝트 분리

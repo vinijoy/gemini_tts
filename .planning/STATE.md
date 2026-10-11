@@ -16,14 +16,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-11)
 
 **Core value:** 대본과 연출 의도를 보존하면서 공식 지원 음성 기능을 쉽게 사용하고, 검증된 완성 음성을 재생·저장한다.
-**Current focus:** quick 261011-pgf/261011-sl3 UI 수정·사용자 VoiceOver 확인·커밋 마감 완료. NVDA·앱 전체 접근성 및 서비스 수용은 별도다.
+**Current focus:** quick 261011-v9n 일괄 생성 제거·제작 UI·두 화자 안내 구현 완료. 이번 화면 VoiceOver 확인 대기.
 
 ## Current Position
 
 Phase: 1 of 3 (3.8 기본 합성과 공식 목소리 선택)
 Plan: 0 of TBD in current phase
 Status: Quick implementation complete — product acceptance pending
-Last activity: 2026-10-11 — 미커밋 API/UI를 0503cbe/0b51afa로 커밋. 새 160 tests, lint, tsc, production build 통과. 생성 탭 순서 사용자 VoiceOver 확인 통과.
+Last activity: 2026-10-11 - Completed quick task 261011-v9n: 일괄 생성 제거·제작 UI 정리·두 화자 안내 수정.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -55,10 +55,10 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - 기존 앱 업데이트만 coarse/MVP 3단계로 정리하며 배포·push·main 병합은 범위 밖이다.
 - 이전 계획-only 제한은 2026-10-11 사용자의 명시적 구현 요청으로 해제됐다. 같은 quick 계획을 재개하여 구현했다.
 - 대본과 문장형 연출을 분리하고 공식 목소리 메타데이터·지원 스키마만 사용한다.
-- Batch inline 및 앱 검증 항목의 JSONL Files 제출을 구현했다. 임의 외부 파일 import와 webhook은 미지원이며 사용자 승인된 제외로 간주하지 않는다.
+- Batch는 최초 quick에서 구현했으나 2026-10-11 사용자 요청으로 일괄 생성 기능을 제거했다(261011-v9n). 과거 요구/검증 기록은 보존하며 완료로 변경하지 않는다.
 - 유료 생성은 자동 검증으로 실행하지 않고 mock 검사와 실제 API·청취·접근성 실기를 구분한다.
 
-- 후속 화면 구성은 음성 만들기 / 목소리 제작·관리 / 일괄 작업 세 탭이다. 입력 상태 보존, 키보드 탐색, 닫힌 검색 폼 제거와 필터 보존을 유지한다. 상세 구현·회귀 근거는 `.planning/ui-followup.md`를 따른다.
+- 현재 화면 구성은 음성 만들기 / 목소리 제작·관리 두 탭이다. 입력 상태 보존, 키보드 탐색, 닫힌 검색 폼 제거와 필터 보존을 유지한다. 상세 구현·회귀 근거는 `.planning/ui-followup.md`를 따른다.
 
 ### 후속 Quick 진행 상태
 
@@ -74,7 +74,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-실제 API 성공·청취·VoiceOver/NVDA 수용, Remix 공개 계약과 webhook 인프라 확인이 남았다. 제공된 GEMINI-TTS-VOICES.md 원문을 보존하고 2,089개(ko-KR 117개)를 로컬 검색에 연결했다. 현재 키의 접근 성공을 의미하지 않는다.
+실제 API 성공·청취·이번 제작 UI VoiceOver/NVDA 수용, Remix 공개 계약 확인이 남았다. Batch/webhook은 이번 사용자 제거 요청에 따른 범위 변경이며 과거 요구사항 문서는 그대로 보존했다. 제공된 GEMINI-TTS-VOICES.md 원문을 보존하고 2,089개(ko-KR 117개)를 로컬 검색에 연결했다. 현재 키의 접근 성공을 의미하지 않는다.
 
 ### Blockers/Concerns
 
@@ -93,6 +93,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 | 261011-pgf | 숨은 탭 메뉴·상태 보존 및 사용자 VoiceOver 확인 | 2026-10-11 | 0b51afa | [261011-pgf-hidden-tab-menus](./quick/261011-pgf-hidden-tab-menus/) |
 | 261011-sl3 | 생성 UI 순서 정리 및 사용자 VoiceOver 확인 | 2026-10-11 | 0b51afa | [261011-sl3-ui](./quick/261011-sl3-ui/) |
 
+| 261011-v9n | 일괄 생성 제거·제작 UI 정리·두 화자 안내; 이번 VoiceOver 확인 대기 | 2026-10-11 | d0c4505 | [261011-v9n-remove-batch-generation-and-align-voice-](./quick/261011-v9n-remove-batch-generation-and-align-voice-/) |
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At | Milestone |
@@ -102,5 +104,5 @@ Decisions are logged in PROJECT.md Key Decisions table.
 ## Session Continuity
 
 Last session: 2026-10-11
-Stopped at: quick 261011-pgf/261011-sl3 커밋 마감 및 사용자 VoiceOver 확인 기록 완료. NVDA·앱 전체 수용은 별도.
-Resume file: .planning/quick/261011-sl3-ui/261011-sl3-SUMMARY.md
+Stopped at: quick 261011-v9n 구현·자동 검사·로컬 커밋 완료. 이번 UI의 사용자 VoiceOver 확인 대기.
+Resume file: .planning/quick/261011-v9n-remove-batch-generation-and-align-voice-/261011-v9n-SUMMARY.md
