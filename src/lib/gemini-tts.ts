@@ -1,4 +1,5 @@
 import { upstream } from "./gemini-client";
+import { dialogueParts } from "./dialogue-blocks";
 import { AppError, object, jsonBytes, MAX_TTS_REQUEST_BYTES, MAX_TTS_REQUEST_CODE_POINTS, MAX_TTS_REQUESTS, type TtsRequest } from "./tts-contract";
 import { base64Bytes, decodeAudio, joinBytes, MAX_AUDIO_BYTES } from "../utils/audio-format";
 // REST의 처리 등급은 generationConfig 내부가 아닌 요청 최상위 필드다.
@@ -13,12 +14,18 @@ function textAtoms(text:string):string[] {
 export function requestGroups(request:TtsRequest):Turn[][] {
  const groups:Turn[][]=[];
  const fits=(turns:Turn[])=>turns.reduce((n,t)=>n+Array.from(t.text).length,0)<=MAX_TTS_REQUEST_CODE_POINTS&&jsonBytes(wireRequest(request,turns))<=MAX_TTS_REQUEST_BYTES;
- const append=(turn:Turn)=>{
+ const append=(turn:Turn|Turn[])=>{
   // 직접 추가한 대사는 연출과 맥락을 따로 지정한 요청 경계다.
-  groups.push([turn]);
+  groups.push(Array.isArray(turn)?turn:[turn]);
   if(groups.length>MAX_TTS_REQUESTS)throw new AppError(400,"분할 생성이 작업당 128회 제한을 넘은 상태입니다.");
  };
  for(const [index,turn] of request.turns.entries()){
+  const parsed=dialogueParts(request,turn,index);
+  if(parsed.named){
+   const planned=request.mode==="prebuilt-dialogue"?[parsed.parts]:parsed.parts.map(part=>[part]);
+   for(const parts of planned){if(!fits(parts))throw new AppError(400,`${index+1}번째 대사의 다화자 내용이 요청 용량을 넘은 상태입니다.`);append(parts);}
+   continue;
+  }
   if(fits([turn])){append(turn);continue;}
   const atoms=textAtoms(turn.text),offsets=[0];for(const atom of atoms)offsets.push(offsets.at(-1)!+atom.length);
   const chunk=(start:number,end:number)=>turn.text.slice(offsets[start],offsets[end]);

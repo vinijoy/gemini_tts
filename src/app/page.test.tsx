@@ -250,6 +250,22 @@ function closeStream() {
     streamSettled = true;
     streamController.close();
 }
+it("두 대화 상자 안의 이름을 각각 설정한 목소리로 보내고 연출과 PCM 순서를 유지한다",async()=>{
+ streamSettled=true;
+ const calls=vi.fn().mockImplementation(()=>Promise.resolve(new Response(`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:"audio/l16;rate=24000",data:Buffer.from([calls.mock.calls.length,0]).toString("base64")}}]},finishReason:"STOP"}]})}\n\n`)));
+ vi.stubGlobal("fetch",vi.fn((url,init)=>url==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):calls(url,init)));
+ const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
+ await user.type(screen.getByLabelText("첫 번째 화자 대본 이름"),"수아");await user.type(screen.getByLabelText("두 번째 화자 대본 이름"),"민재");
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"수아: 내 그 말 때문에 진짜 많이 버텼다.\n\n민재: 야, 갑자기 와 이라노."}});
+ fireEvent.change(screen.getByLabelText("스타일 및 감정 입력창"),{target:{value:" 첫 연출\n"}});
+ await user.click(screen.getByRole("button",{name:"대사 추가"}));
+ fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"민재: 다음 대화.\n수아: 그래."}});fireEvent.change(screen.getByLabelText("발화 2 연출"),{target:{value:" 뒤 연출 "}});
+ await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));expect(await screen.findByRole("link",{name:"생성된 음성 파일 다운로드"})).toBeVisible();
+ expect(calls).toHaveBeenCalledTimes(2);const wires=calls.mock.calls.map(([,init])=>JSON.parse(init.body));
+ expect(wires.map(w=>w.contents[0].parts.map((p:{speechMetadata:{speaker:string;style:string}})=>p.speechMetadata))).toEqual([[{speaker:"A",style:" 첫 연출\n"},{speaker:"B",style:" 첫 연출\n"}],[{speaker:"B",style:" 뒤 연출 "},{speaker:"A",style:" 뒤 연출 "}]]);
+ for(const wire of wires)expect(wire.generationConfig.speechConfig.multiSpeakerVoiceConfig.speakerVoiceConfigs).toEqual([{speaker:"A",voiceConfig:{voice:"Puck"}},{speaker:"B",voiceConfig:{voice:"Kore"}}]);
+ expect(player.enqueue.mock.calls.flatMap(([samples])=>Array.from(samples))).toEqual([1,2]);expect(createObjectUrl.mock.calls.at(-1)?.[0].type).toBe("audio/wav");
+});
 function errorStream(error: Error) {
     streamSettled = true;
     streamController.error(error);
