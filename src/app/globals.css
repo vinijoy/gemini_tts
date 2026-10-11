@@ -23,7 +23,7 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* 새 목소리·Batch 패널도 기본 입력·키보드 초점 경계를 분명히 표시한다. */
+/* 목소리 제작·관리 패널도 기본 입력·키보드 초점 경계를 분명히 표시한다. */
 fieldset label { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.8rem 0; font-weight: 500; }
 fieldset label:has(input[type=checkbox]) { flex-direction: row; align-items: flex-start; }
 fieldset input:not([type=checkbox]), fieldset textarea, fieldset select { width: 100%; min-width: 0; padding: 0.55rem; border: 1px solid #a78bba; border-radius: 0.5rem; background: white; color: #24202b; }

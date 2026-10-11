@@ -9,10 +9,7 @@ import Home from "./page";
 import { POST } from "./api/tts/route";
 import VoiceStudio from "./components/VoiceStudio";
 import VoiceLibrary from "./components/VoiceLibrary";
-import BatchPanel from "./components/BatchPanel";
-import { defaultRequest } from "./components/TtsEditor";
 import { POST as voicePost } from "./api/voices/route";
-import { POST as batchPost } from "./api/batches/route";
 const player = vi.hoisted(() => ({
     activate: vi.fn<() => Promise<void>>(),
     close: vi.fn<() => Promise<void>>(),
@@ -56,42 +53,22 @@ it("기능 탭을 키보드로 이동하며 입력과 제작 초안을 유지한
     await user.type(screen.getByLabelText(/설계 설명/), "유지할 목소리 설명");
     studioTab.focus();
     await user.keyboard("{End}");
-    expect(screen.getByRole("tab", {name: "일괄 작업"})).toHaveFocus();
+    expect(studioTab).toHaveFocus();
     expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
-    expect(screen.getByRole("region", {name: "일괄 작업"})).toBeVisible();
+    expect(screen.getByRole("region", {name: "목소리 제작과 관리"})).toBeVisible();
     await user.keyboard("{ArrowRight}");
     expect(generationTab).toHaveFocus();
     expect(screen.getByLabelText("음성으로 변환할 텍스트 입력창")).toHaveValue("유지할 대본");
-    await user.keyboard("{ArrowLeft}{ArrowLeft}");
+    await user.keyboard("{ArrowLeft}");
     expect(screen.getByLabelText(/설계 설명/)).toHaveValue("유지할 목소리 설명");
     studioTab.focus();
     await user.keyboard("{Home}");
     expect(generationTab).toHaveFocus();
     expect(fetch).not.toHaveBeenCalled();
 });
-it("숨은 일괄 패널에서 선택 메뉴를 제거하고 제출 초안을 보존한다", async () => {
-    const user = userEvent.setup();
-    const {container} = render(<Home />);
-    const batch = container.querySelector("#panel-batch")!;
-    expect(batch.querySelectorAll("select")).toHaveLength(0);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "보존할 일괄 대본");
-    await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
-    await user.selectOptions(screen.getByLabelText("입력 제출 방식"), "file");
-    await user.clear(screen.getByLabelText("작업 표시 이름"));
-    await user.type(screen.getByLabelText("작업 표시 이름"), "보존할 작업");
-    await user.click(screen.getByRole("button", {name: "현재 대본 담기"}));
-    await user.click(screen.getByRole("tab", {name: "음성 만들기"}));
-    expect(batch.querySelectorAll("select")).toHaveLength(0);
-    await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
-    expect(screen.getByLabelText("입력 제출 방식")).toHaveValue("file");
-    expect(screen.getByLabelText("작업 표시 이름")).toHaveValue("보존할 작업");
-    expect(screen.getByRole("button", {name: "항목 1 제거"})).toBeVisible();
-    expect(screen.getByRole("listitem")).toHaveTextContent("보존할 일괄 대본");
-    expect(fetch).not.toHaveBeenCalled();
-});
 function expectOnlyActiveSelects(container: HTMLElement) {
     const hidden = container.querySelectorAll('[role="tabpanel"][hidden], [role="region"][hidden]');
-    expect(hidden.length).toBeGreaterThanOrEqual(3);
+    expect(hidden.length).toBeGreaterThanOrEqual(2);
     hidden.forEach(panel => expect(panel.querySelectorAll("select")).toHaveLength(0));
     expect(container.querySelectorAll('[role="tabpanel"]:not([hidden]) select').length).toBeGreaterThan(0);
 }
@@ -115,7 +92,7 @@ it("모든 탭의 선택 메뉴와 열린 검색·두 화자·추가 발화 설�
     await waitFor(()=>expect(screen.getByLabelText("화자 B 언어")).toBeEnabled());
     await user.selectOptions(await screen.findByLabelText("화자 B 언어"), "ko-KR");
     await user.selectOptions(screen.getByLabelText("화자 B 지역"), "KR");
-    for (const name of ["목소리 제작·관리", "일괄 작업", "음성 만들기"]) {
+    for (const name of ["목소리 제작·관리", "음성 만들기"]) {
         await user.click(screen.getByRole("tab", {name}));
         expectOnlyActiveSelects(container);
     }
@@ -151,7 +128,7 @@ it("제작 탭 왕복에서 선택값과 빈 직접 입력 모드·첨부 File·
     await user.upload(consentInput, consent);
     const check = screen.getByLabelText("성인 본인의 원본 목소리이며 복제에 동의합니다.");
     await user.click(check);
-    await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
+    await user.click(screen.getByRole("tab", {name: "음성 만들기"}));
     expectOnlyActiveSelects(container);
     await user.click(screen.getByRole("tab", {name: "목소리 제작·관리"}));
     expect(screen.getByLabelText("제작 방식")).toHaveValue("replicated");
@@ -172,10 +149,10 @@ it("숨은 생성 탭에서도 스트림을 끝까지 유지하고 결과를 복
     await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "탭 밖 생성");
     await user.click(screen.getByRole("button", {name: "음성 생성하기 버튼"}));
     const requestSignal = vi.mocked(fetch).mock.calls[0][1]?.signal;
-    await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
+    await user.click(screen.getByRole("tab", {name: "목소리 제작·관리"}));
     expect(requestSignal?.aborted).toBe(false);
     await act(async () => { streamController.enqueue(Uint8Array.from([0, 0])); closeStream(); });
-    expect(screen.getByRole("tab", {name: "일괄 작업"})).toHaveFocus();
+    expect(screen.getByRole("tab", {name: "목소리 제작·관리"})).toHaveFocus();
     await user.click(screen.getByRole("tab", {name: "음성 만들기"}));
     expect(await screen.findByRole("link", {name: "생성된 음성 파일 다운로드"})).toBeVisible();
     expect(fetch).toHaveBeenCalledOnce();
@@ -189,7 +166,7 @@ it("숨은 검색의 늦은 응답은 선택 상태를 보존하고 활성 탭�
 
 
     const signal = vi.mocked(fetch).mock.calls[0][1]?.signal;
-    const tab = screen.getByRole("tab", {name: "일괄 작업"});
+    const tab = screen.getByRole("tab", {name: "목소리 제작·관리"});
     await user.click(tab);
     await act(async () => resolve(new Response(JSON.stringify({voices: [{id:"remote_voice",name:"원격 목소리",type:"prompted",languages:[],description:"보존된 결과"}],nextPageToken:""}))));
     expect(signal?.aborted).toBe(false);
@@ -213,7 +190,7 @@ it("숨은 제작 요청이 완료되어도 활성 탭 초점과 결과 ID를 �
     await user.click(screen.getByRole("tab", {name: "목소리 제작·관리"}));
     await user.type(screen.getByLabelText(/설계 설명/), "목소리 설명");
     await user.click(screen.getByRole("button", {name: "목소리 생성 (유료 요청)"}));
-    const tab = screen.getByRole("tab", {name: "일괄 작업"});
+    const tab = screen.getByRole("tab", {name: "음성 만들기"});
     await user.click(tab);
     await act(async () => resolve(new Response(JSON.stringify({id:"voice_background",name:"완료 목소리",type:"prompted",languages:[]}))));
     expect(tab).toHaveFocus();
@@ -222,31 +199,6 @@ it("숨은 제작 요청이 완료되어도 활성 탭 초점과 결과 ID를 �
     await user.click(screen.getByRole("tab", {name: "음성 만들기"}));
     expect(screen.getByLabelText("음성 선택")).toHaveValue("voice_background");
     expect(fetch).toHaveBeenCalledOnce();
-});
-it("비활성 일괄 탭에서도 30초 조회를 유지하고 종료 상태에서 멈춘다", async () => {
-    vi.useFakeTimers({toFake:["setInterval", "clearInterval"]});
-    try {
-        const pending = {name:"batches/preserved",state:"PENDING",priority:0};
-        const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(pending)))
-            .mockResolvedValueOnce(new Response(JSON.stringify({...pending,state:"SUCCEEDED"})));
-        vi.stubGlobal("fetch", fetchMock);
-        const user = userEvent.setup();
-        render(<Home />);
-        await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
-        await user.type(screen.getByLabelText("일괄 작업 이름"), pending.name);
-        await user.click(screen.getByRole("button", {name: "작업 열기·새로고침"}));
-        await waitFor(() => expect(screen.getByRole("button", {name:"내부 우선순위 변경"})).toBeEnabled());
-        await user.click(screen.getByRole("tab", {name: "목소리 제작·관리"}));
-        await act(async () => { await vi.advanceTimersByTimeAsync(29999); });
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        await user.click(screen.getByRole("tab", {name: "일괄 작업"}));
-        expect(screen.getByLabelText("일괄 작업 이름")).toHaveValue(pending.name);
-        expect(screen.getByRole("button", {name:"결과 회수"})).toBeEnabled();
-    } finally { cleanup(); vi.useRealTimers(); }
 });
 it("두 화자의 카테고리는 독립적이며 숨긴 탭에는 선택 메뉴가 없다", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({voices:[{id:"korean",name:"한국어 목소리",type:"prompted",languages:["ko-KR"],regions:["KR"]}],nextPageToken:""})))));
@@ -275,19 +227,6 @@ it("키보드로 Design을 제출하고 실제 앱 API가 반환한 저장 음�
     await waitFor(() => expect(select).toHaveBeenCalledWith({ kind: "stored-custom", value: "voice_1" }));
     expect(screen.getByRole("button", { name: "확인한 목소리 삭제" })).toBeDisabled();
     expect(screen.getByText(/기존 목소리 변형 기능은/)).toBeInTheDocument();
-});
-it("Batch 패널은 명시 제출 후에만 API를 호출하고 원격 이름을 복구 가능하게 보여 준다", async () => {
-    streamSettled = true;
-    const fetch = vi.fn(async (url, init) => url === "/api/batches" ? batchPost(new Request("http://localhost/api/batches", init)) : new Response(JSON.stringify({ name: "batches/test", metadata: { state: "BATCH_STATE_PENDING" } })));
-    vi.stubGlobal("fetch", fetch);
-    const user = userEvent.setup();
-    render(<BatchPanel request={{ ...defaultRequest, turns: [{ speaker: "A", text: "일괄 음성", style: "" }] }}/>);
-    expect(fetch).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "현재 대본 담기" }));
-    expect(fetch).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "일괄 제출 (유료 요청)" }));
-    await waitFor(() => expect(screen.getByLabelText("일괄 작업 이름")).toHaveValue("batches/test"));
-    expect(screen.getByRole("button", { name: "확인한 일괄 작업 취소 요청" })).toBeDisabled();
 });
 it("화면 제출부터 실제 POST와 REST 응답을 거쳐 완료 WAV까지 연결한다", async () => {
     streamSettled = true;

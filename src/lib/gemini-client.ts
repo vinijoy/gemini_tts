@@ -84,16 +84,3 @@ catch (e) {
 } }
 export function errorResponse(error: unknown): Response { return Response.json({ error: error instanceof AppError ? error.message : "요청 처리 중 오류가 발생한 상태입니다. 잠시 후 다시 시도하세요." }, { status: error instanceof AppError ? error.status : 502, headers: { "Cache-Control": "no-store" } }); }
 export function json(data: unknown): Response { return Response.json(data, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } }); }
-export async function uploadJsonl(text: string): Promise<string> { const size = new TextEncoder().encode(text).length; if (size > 1024 * 1024)
-    throw new AppError(413, "입력 파일이 앱의 1MiB 제한을 넘은 상태입니다."); const start = await upstream("/upload/v1beta/files", { method: "POST", headers: { "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(size), "X-Goog-Upload-Header-Content-Type": "application/jsonl" }, body: JSON.stringify({ file: { display_name: "TTS Batch input" } }) }); const location = start.headers.get("x-goog-upload-url"); await start.body?.cancel(); let url: URL; try {
-    url = new URL(location ?? "");
-}
-catch {
-    throw new AppError(502, "파일 업로드 주소가 없는 상태입니다.");
-} if (url.origin !== HOST || !url.pathname.startsWith("/upload/v1beta/files") || url.username || url.password || url.hash)
-    throw new AppError(502, "파일 업로드 주소가 올바르지 않은 상태입니다."); const response = await upstreamJson(url.pathname + url.search, { method: "POST", headers: { "Content-Type": "application/jsonl", "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: text }); const name = (response as {
-    file?: {
-        name?: unknown;
-    };
-})?.file?.name; if (typeof name !== "string" || !/^files\/[A-Za-z0-9_-]+$/.test(name))
-    throw new AppError(502, "업로드 파일 이름이 올바르지 않은 상태입니다."); return name; }

@@ -7,7 +7,6 @@ import { StreamingPcmPlayer } from "@/utils/streaming-player";
 import { TabPanel, TabSelect } from "./components/TabPanel";
 import VoiceLibrary from "./components/VoiceLibrary";
 import VoiceStudio from "./components/VoiceStudio";
-import BatchPanel from "./components/BatchPanel";
 import { voiceRef } from "@/lib/voice-catalog";
 import TtsEditor, { defaultRequest } from "./components/TtsEditor";
 import { parseTts, VOICE_NAMES, type TtsRequest } from "@/lib/tts-contract";
@@ -84,7 +83,6 @@ export default function Home() {
     const tabs = [
         {id: "generate", label: "음성 만들기"},
         {id: "studio", label: "목소리 제작·관리"},
-        {id: "batch", label: "일괄 작업"},
     ];
     const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const [options, setOptions] = useState<TtsRequest>(defaultRequest);
@@ -398,7 +396,7 @@ export default function Home() {
         </header>
 
         <section className="space-y-6">
-          <p>처음에는 대본을 입력하고 목소리를 고른 뒤 ‘음성 생성 시작’을 누르세요. 말투를 바꾸고 싶으면 ‘읽는 말투와 감정’을 입력하세요. 여러 대본을 모아서 만들 때는 일괄 작업을 사용하세요.</p>
+          <p>처음에는 대본을 입력하고 목소리를 고른 뒤 ‘음성 생성 시작’을 누르세요. 말투를 바꾸고 싶으면 ‘읽는 말투와 감정’을 입력하세요.</p>
           <div role="tablist" aria-label="음성 작업" className="flex flex-wrap gap-2 border-b border-purple-200 pb-3">
             {tabs.map((tab, index) => <button
               key={tab.id}
@@ -425,9 +423,6 @@ export default function Home() {
           {/* 비활성 패널은 입력 상태를 보존하면서 화면·초점·접근성 트리에서 제외한다. */}
           <TabPanel active={activeTab === "studio"} id="panel-studio" aria-labelledby="tab-studio" tabIndex={0}>
             <VoiceStudio onSelect={ref=>{setVoice(ref.value);setOptions({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:ref}:s)});}}/>
-          </TabPanel>
-          <TabPanel active={activeTab === "batch"} id="panel-batch" aria-labelledby="tab-batch" tabIndex={0}>
-            <BatchPanel request={{...options,speakers:options.speakers.map((s,i)=>i===0&&s.voice.kind==="prebuilt-name"?{...s,voice:{kind:"prebuilt-name",value:voice}}:s),turns:options.turns.map((t,i)=>i===0?{...t,text,style:stylePrompt}:t)}}/>
           </TabPanel>
           <TabPanel active={activeTab === "generate"} id="panel-generate" aria-labelledby="tab-generate" tabIndex={0} className="space-y-6">
           <section aria-labelledby="generation-setup" className="space-y-4">
