@@ -22,9 +22,11 @@ status: complete
 - Next 16.2.12 bundled use-client/route 원문은 기존 docs/nextjs에 완전 보관되어 있음을 비교했다.
 
 ## 실행·한계
-기본 quick이며 별도 planner/executor/verifier 에이전트가 아닌 adapter의 직접 실행 경로다. isolation resolver는 orchestrator-worktree였으며 single-agent gate에 따라 none으로 기록했다. 새로운 유료 요청·실제 음성 청취·VoiceOver 발화·NVDA 검사는 수행하지 않았다. 이번 화면의 사용자 VoiceOver 확인은 대기다.
+기본 quick이며 별도 planner/executor/verifier 에이전트가 아닌 adapter의 직접 실행 경로다. isolation resolver는 orchestrator-worktree였으며 single-agent gate에 따라 none으로 기록했다. 새로운 유료 요청·실제 음성 청취·VoiceOver 발화·NVDA 검사는 수행하지 않았다. 구현 당시 사용자 VoiceOver 확인은 대기였으며, 아래 후속 확인으로 이번 UI 수용은 통과했다.
 
 closeout snapshot은 부모 경로를 만든 뒤 재시도했으나 Phase 1에 PLAN이 없어 지원되지 않았다. guard 통과를 주장하지 않는다. 기존 ROADMAP/REQUIREMENTS/phase 기록은 git 비교로 보존을 확인한다. 기존 단계 전체 완료를 뜻하지 않는다.
 
-## 사용자 확인 뒤 할 일
-이번 제작 구역과 두 화자 안내의 VoiceOver 사용감 확인을 ui-followup에 기록한다. 확인 전에는 새 UI 선호를 전역 확정 규칙으로 만들지 않는다. 기존 STRUCTURE의 DOM/탭/숨은 메뉴 규칙을 적용했으며 새 studio-order 및 두 화자 회귀가 자동 재발 방지를 담당한다.
+## 사용자 VoiceOver 확인과 재발 방지 — 2026-10-11
+빈이가 “보이스오버에서도 문제 없어.”라고 직접 확인했다. 이번 두 탭 구성·제작 구역·두 화자 안내·대사 추가 변경의 사용자 VoiceOver 수용은 통과다. NVDA·앱 전체 접근성·실제 생성 음성 품질의 완료로 확대하지 않는다.
+
+STRUCTURE의 새 코드 추가 위치에 제작 구역/DOM 순서, 상태·첨부·숨은 초점, 두 화자 안내·대사 추가 및 기존 회귀 실행 진입점을 추가했다. AGENTS 라우터에 제작·관리 화면을 포함했다. ui-followup과 STATE에 확인 상태를 동기화했다. 코드 변경이 없어 테스트/빌드 재실행은 생략하고 변경 문서의 내용·링크·형식·중복·범위와 기존 요구사항/단계 기록 보존을 검증했다.

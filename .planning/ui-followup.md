@@ -60,3 +60,10 @@ Superpowers로 수행한 후속 수정의 현재 작업 트리를 GSD에 연결�
 - 검사: 전체 140 tests(최종 문구 정정 직전), 최종 문구 정정 후 관련 35 tests, lint·tsc·build 통과. in-app native AX에서 두 탭/다섯 제목/복제 입력 순서 확인. 실제 VoiceOver 발화·NVDA·유료 서비스는 미수행이며 사용자 확인 대기다.
 - 이번 코드: 8319faf / 819afe7 / d0c4505. 상세 실행/한계는 quick/261011-v9n-remove-batch-generation-and-align-voice-/261011-v9n-SUMMARY.md.
 - 재발 방지: 기존 STRUCTURE 정본을 적용하고 studio-order.test.tsx 및 generation-order.test.tsx의 두 화자 검사를 보완했다. 사용자 VoiceOver 확인 이후에만 이번 배치의 수용 상태와 정본 선호를 확정한다.
+
+
+## 261011-v9n 사용자 VoiceOver 수용 — 2026-10-11
+
+빈이가 “보이스오버에서도 문제 없어.”라고 직접 확인했다. 이번 일괄 탭 제거 후 두 탭 구성, 제작·관리 구역 순서, 두 화자 안내와 “대사 추가” 버튼 변경의 사용자 VoiceOver 수용을 통과로 기록한다. 앞의 사용자 확인 대기는 구현 직후의 기록이며 이 확인이 최신 상태다. 에이전트가 VoiceOver 발화를 직접 검사한 것으로 기록하지 않는다. NVDA·앱 전체 접근성·유료 서비스·음성 품질은 확인 범위에 포함하지 않는다.
+
+재발 방지는 `codebase/STRUCTURE.md`의 “새 코드 추가 위치”에 제작 구역/탐색 순서와 두 화자 안내·버튼·검사 진입점을 정본으로 추가했다. 프로젝트 `AGENTS.md`의 진입 조건에 제작·관리 화면을 포함하여 다음 유사 수정 전에 읽게 했다. 기존 테스트를 진입점으로 재사용하며 이번에는 코드 변경 없이 기록·규칙·링크·Git diff를 검증한다.
