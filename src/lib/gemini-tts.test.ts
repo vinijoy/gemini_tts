@@ -16,3 +16,21 @@ it("structured single synthesis sends style separately and completes validated P
   expect(body.generationConfig.responseFormat.audio).toEqual({mimeType:"AUDIO_L16",sampleRate:24000});
   expect(response.headers.get("x-gemini-service-tier")).toBe("standard");
 });
+it.each(["standard", "flex", "priority"] as const)("REST 처리 등급 %s는 최상위 service_tier로 전송한다", async (tier) => {
+  const {wireRequest}=await import("./gemini-tts");
+  const {parseTts}=await import("./tts-contract");
+  const request={...parseTts({text:"안녕하세요.",voice:"Puck"}),serviceTier:tier};
+  const body=wireRequest(request);
+  expect(body).toHaveProperty("service_tier",tier);
+  expect(body.generationConfig).not.toHaveProperty("serviceTier");
+});
+it("잘못된 API 요청을 일시적인 서비스 장애로 안내하지 않는다",async()=>{
+ const {upstream}=await import("./gemini-client");
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({error:{message:"Invalid JSON payload received",status:"INVALID_ARGUMENT"}}),{status:400})));
+ await expect(upstream("/v1beta/models/test:generateContent")).rejects.toMatchObject({status:400,message:expect.stringContaining("생성 설정")});
+});
+it("월 지출 한도 초과는 기다리라는 안내 없이 계정 설정을 안내한다",async()=>{
+ const {upstream}=await import("./gemini-client");
+ vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({error:{message:"Your project has exceeded its monthly spending cap.",status:"RESOURCE_EXHAUSTED"}}),{status:429})));
+ await expect(upstream("/v1beta/models/test:generateContent")).rejects.toMatchObject({status:429,retryAfterMs:null,message:expect.stringContaining("월 지출 한도")});
+});

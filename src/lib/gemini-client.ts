@@ -23,6 +23,9 @@ export async function upstream(path: string, init: RequestInit = {}): Promise<Re
         let retry: number | null = null;
         if (status === 429) {
             const detail = await limitedText(response, 16384).catch(() => "");
+            // 월 지출 제한은 일시적인 속도 제한과 달리 자동 재시도로 해결되지 않는다.
+            if (/monthly spending cap|monthly spend cap/i.test(detail))
+                throw new AppError(429, "Google AI 프로젝트의 월 지출 한도에 도달해 음성을 생성할 수 없습니다. Google AI Studio의 지출 한도 설정을 확인하세요.");
             const match = detail.match(/retryDelay[\"]?\s*:\s*[\"]?([0-9.]+)s/i) ?? detail.match(/retry in ([0-9.]+)s/i);
             const seconds = Number(response.headers.get("retry-after") ?? match?.[1]);
             if (/GenerateRequestsPerMinute|generate_requests_per_model/i.test(detail) && !/GenerateRequestsPerDay|generate_content_free_tier_requests/i.test(detail) && seconds >= 1 && seconds <= 65)
@@ -30,6 +33,8 @@ export async function upstream(path: string, init: RequestInit = {}): Promise<Re
         }
         else
             await response.body?.cancel();
+        if (status === 400)
+            throw new AppError(400, "선택한 목소리 또는 생성 설정을 서비스에서 처리하지 못했습니다. 목소리·모델·출력 설정을 확인하세요.");
         throw new AppError(status === 429 ? 429 : status === 404 ? 404 : status === 401 || status === 403 ? 403 : 502, status === 429 ? "음성 서비스 요청 한도가 초과된 상태입니다. 잠시 후 다시 시도하세요." : status === 404 ? "요청한 목소리 또는 작업이 없거나 만료된 상태입니다." : status === 401 || status === 403 ? "이 기능에 대한 계정 권한이 없는 상태입니다. 키와 서비스 권한을 확인하세요." : "음성 서비스 응답에 문제가 있는 상태입니다. 잠시 후 다시 시도하세요.", retry);
     }
     return response;
