@@ -1,7 +1,10 @@
 "use client";
+import TimedLiveRegion from "./components/TimedLiveRegion";
+import { voiceLabel, TIER_LABELS } from "@/lib/tts-labels";
 import { useEffect, useRef, useState } from "react";
 import { PcmChunkAssembler, createWavBlob, pcm16BytesToSamples, } from "@/utils/pcm-audio";
 import { StreamingPcmPlayer } from "@/utils/streaming-player";
+import { TabPanel, TabSelect } from "./components/TabPanel";
 import VoiceLibrary from "./components/VoiceLibrary";
 import VoiceStudio from "./components/VoiceStudio";
 import BatchPanel from "./components/BatchPanel";
@@ -71,8 +74,19 @@ export default function Home() {
     const maxTextLength = 1000;
     const [announcement,setAnnouncement]=useState("");
     useEffect(()=>{const receive=(event:Event)=>setAnnouncement((event as CustomEvent<string>).detail);window.addEventListener("tts-status",receive);return()=>window.removeEventListener("tts-status",receive);},[]);
-    const [showStudio, setShowStudio] = useState(false);
-    const [showBatch, setShowBatch] = useState(false);
+    const [voiceMethod, setVoiceMethod] = useState("basic");
+    const voiceMethods = [
+        {id: "basic", label: "기본 목소리"},
+        {id: "library", label: "확장·저장 목소리"},
+    ];
+    const voiceMethodRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const [activeTab, setActiveTab] = useState("generate");
+    const tabs = [
+        {id: "generate", label: "음성 만들기"},
+        {id: "studio", label: "목소리 제작·관리"},
+        {id: "batch", label: "일괄 작업"},
+    ];
+    const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const [options, setOptions] = useState<TtsRequest>(defaultRequest);
     const [actualTier, setActualTier] = useState("미확인");
     const completedOutputRef = useRef(defaultRequest.output);
@@ -384,37 +398,118 @@ export default function Home() {
         </header>
 
         <section className="space-y-6">
-          <button type="button" aria-expanded={showStudio} onClick={()=>setShowStudio(!showStudio)}>목소리 제작·관리 {showStudio?"닫기":"열기"}</button>
-          {showStudio&&<VoiceStudio onSelect={ref=>{setVoice(ref.value);setOptions({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:ref}:s)});}}/>}
-          <button type="button" aria-expanded={showBatch} onClick={()=>setShowBatch(!showBatch)}>Batch 작업 {showBatch?"닫기":"열기"}</button>
-          {showBatch&&<BatchPanel request={{...options,speakers:options.speakers.map((s,i)=>i===0&&s.voice.kind==="prebuilt-name"?{...s,voice:{kind:"prebuilt-name",value:voice}}:s),turns:options.turns.map((t,i)=>i===0?{...t,text,style:stylePrompt}:t)}}/>}
-          {/* 텍스트 입력부 */}
-          <div className="flex flex-col space-y-2">
-            <label htmlFor="tts-text" className="font-semibold text-gray-700">
-              변환할 텍스트 (Text Input)
-            </label>
-            <textarea id="tts-text" className="w-full h-32 p-4 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none" placeholder="음성으로 변환할 텍스트를 입력해주세요..." value={text} maxLength={maxTextLength} onChange={(e) => setText(e.target.value.slice(0, maxTextLength))} disabled={isLoading} aria-label="음성으로 변환할 텍스트 입력창"/>
+          <p>처음에는 대본을 입력하고 목소리를 고른 뒤 ‘음성 생성 시작’을 누르세요. 말투를 바꾸고 싶으면 ‘읽는 말투와 감정’을 입력하세요. 여러 대본을 모아서 만들 때는 일괄 작업을 사용하세요.</p>
+          <div role="tablist" aria-label="음성 작업" className="flex flex-wrap gap-2 border-b border-purple-200 pb-3">
+            {tabs.map((tab, index) => <button
+              key={tab.id}
+              ref={element => { tabRefs.current[index] = element; }}
+              type="button" role="tab" id={`tab-${tab.id}`} aria-controls={`panel-${tab.id}`}
+              aria-selected={activeTab === tab.id} tabIndex={activeTab === tab.id ? 0 : -1}
+              className={`rounded-lg px-4 py-3 font-semibold ${activeTab === tab.id ? "bg-purple-700 text-white" : "bg-purple-50 text-purple-900 hover:bg-purple-100"}`}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={event => {
+                let next: number;
+                switch (event.key) {
+                  case "ArrowRight": next = (index + 1) % tabs.length; break;
+                  case "ArrowLeft": next = (index + tabs.length - 1) % tabs.length; break;
+                  case "Home": next = 0; break;
+                  case "End": next = tabs.length - 1; break;
+                  default: return;
+                }
+                event.preventDefault();
+                setActiveTab(tabs[next].id);
+                tabRefs.current[next]?.focus();
+              }}
+            >{tab.label}</button>)}
           </div>
+          {/* 비활성 패널은 입력 상태를 보존하면서 화면·초점·접근성 트리에서 제외한다. */}
+          <TabPanel active={activeTab === "studio"} id="panel-studio" aria-labelledby="tab-studio" tabIndex={0}>
+            <VoiceStudio onSelect={ref=>{setVoice(ref.value);setOptions({...options,speakers:options.speakers.map((s,i)=>i===0?{...s,voice:ref}:s)});}}/>
+          </TabPanel>
+          <TabPanel active={activeTab === "batch"} id="panel-batch" aria-labelledby="tab-batch" tabIndex={0}>
+            <BatchPanel request={{...options,speakers:options.speakers.map((s,i)=>i===0&&s.voice.kind==="prebuilt-name"?{...s,voice:{kind:"prebuilt-name",value:voice}}:s),turns:options.turns.map((t,i)=>i===0?{...t,text,style:stylePrompt}:t)}}/>
+          </TabPanel>
+          <TabPanel active={activeTab === "generate"} id="panel-generate" aria-labelledby="tab-generate" tabIndex={0} className="space-y-6">
+          <section aria-labelledby="generation-setup" className="space-y-4">
+            <h2 id="generation-setup" className="text-lg font-bold text-purple-900">1. 모델과 화자</h2>
+          <TtsEditor section="setup" value={options} onChange={setOptions} disabled={isLoading}/>
+          </section>
 
+          <section aria-labelledby="generation-voices" className="space-y-4">
+            <h2 id="generation-voices" className="text-lg font-bold text-purple-900">2. 목소리 선택</h2>
+          <fieldset className="space-y-2">
+            <legend className="font-semibold text-gray-700">목소리 선택 방법</legend>
+            <div className="flex flex-wrap gap-2">
+              {voiceMethods.map((method, index) => <label
+                key={method.id}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-3 ${voiceMethod === method.id ? "bg-purple-700 text-white" : "bg-purple-50 text-purple-900"}`}
+              >
+                <input
+                  type="radio" name="voice-method" id={`voice-method-${method.id}`} value={method.id}
+                  ref={element => { voiceMethodRefs.current[index] = element; }}
+                  checked={voiceMethod === method.id} onChange={() => setVoiceMethod(method.id)}
+                  onKeyDown={event => {
+                    // 스크린리더 보조키는 가로채지 않고, 일반 좌우 키만 그룹 안에서 순환한다.
+                    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+                    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const direction = event.key === "ArrowRight" ? 1 : -1;
+                    const next = (index + direction + voiceMethods.length) % voiceMethods.length;
+                    setVoiceMethod(voiceMethods[next].id);
+                    voiceMethodRefs.current[next]?.focus();
+                  }}
+                  aria-controls={`voice-panel-${method.id}`}
+                  className="h-4 w-4 accent-purple-700 focus-visible:outline-2 focus-visible:outline-offset-2"
+                />
+                {method.label}
+              </label>)}
+            </div>
+          </fieldset>
+          <p>현재 화자 A 목소리: {voices.includes(voice) ? voiceLabel(voice) : "맞춤 또는 확장 목소리"}</p>
+          <TabPanel active={voiceMethod === "basic"} id="voice-panel-basic" role="region" aria-labelledby="voice-method-basic">
           {/* 파라미터 조절부 */}
           <div className="grid grid-cols-1 gap-4">
             <div className="flex flex-col space-y-2">
               <label htmlFor="voice-select" className="font-semibold text-gray-700">
                 음성 선택
               </label>
-              <select id="voice-select" className="w-full p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" value={voice} onChange={(e) => { setVoice(e.target.value); setOptions({ ...options, speakers: options.speakers.map((s, i) => i === 0 ? { ...s, voice: { kind: "prebuilt-name", value: e.target.value } } : s) }); }} disabled={isLoading} aria-label="음성 선택">
+              <TabSelect id="voice-select" className="w-full p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" value={voice} onChange={(e) => { setVoice(e.target.value); setOptions({ ...options, speakers: options.speakers.map((s, i) => i === 0 ? { ...s, voice: { kind: "prebuilt-name", value: e.target.value } } : s) }); }} disabled={isLoading} aria-label="음성 선택">
                 {!voices.includes(voice)&&<option value={voice}>맞춤 또는 확장 목소리 (선택됨)</option>}
                 {voices.map((v) => (<option key={v} value={v}>
-                    {v}
+                    {voiceLabel(v)}
                   </option>))}
-              </select>
+              </TabSelect>
             </div>
           </div>
 
-          {options.speakers.map((speaker, i) => <VoiceLibrary key={speaker.id} label={`화자 ${speaker.id}`} disabled={isLoading} onSelect={v => { const ref = voiceRef(v); if (i === 0)
+          {options.mode !== "single" && <TtsEditor section="speakers" value={options} onChange={setOptions} disabled={isLoading}/>}
+          </TabPanel>
+          <TabPanel active={voiceMethod === "library"} id="voice-panel-library" role="region" aria-labelledby="voice-method-library">
+          {options.speakers.map((speaker, i) => <VoiceLibrary searchOnly key={speaker.id} label={`화자 ${speaker.id}`} disabled={isLoading} onSelect={v => { const ref = voiceRef(v); if (i === 0)
         setVoice(ref.value); setOptions({ ...options, speakers: options.speakers.map((s, n) => i === n ? { ...s, voice: ref } : s) }); }}/>)}
-          <TtsEditor value={options} onChange={setOptions} disabled={isLoading}/>
-          <p>실제 처리 등급: {actualTier === "unknown" ? "미확인" : actualTier}</p>
+          </TabPanel>
+          </section>
+
+          <section aria-labelledby="generation-script" className="space-y-4">
+            <h2 id="generation-script" className="text-lg font-bold text-purple-900">3. 대본과 연출</h2>
+          {/* 텍스트 입력부 */}
+          <div className="flex flex-col space-y-2">
+            <label htmlFor="tts-text" className="font-semibold text-gray-700">
+              변환할 텍스트
+            </label>
+            <textarea id="tts-text" className="w-full h-32 p-4 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none" placeholder="음성으로 변환할 텍스트를 입력해주세요..." value={text} maxLength={maxTextLength} onChange={(e) => setText(e.target.value.slice(0, maxTextLength))} disabled={isLoading} aria-label="음성으로 변환할 텍스트 입력창"/>
+          </div>
+
+          {/* 스타일/감정 입력창 */}
+          <div className="flex flex-col space-y-2">
+            <label htmlFor="style-prompt" className="font-semibold text-gray-700">
+              읽는 말투와 감정
+            </label>
+            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} maxLength={1000} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="스타일 및 감정 입력창"/>
+          </div>
+
+
           {/* 공식 태그는 대본 원문에 유지한다. */}
           <div className="flex flex-col space-y-2">
             <span className="font-semibold text-gray-700">감정 및 효과 태그 (클릭하여 추가)</span>
@@ -433,18 +528,16 @@ export default function Home() {
             <p className="text-xs text-gray-500">※ 텍스트 내에 태그를 삽입하여 풍부한 감정 변화를 연출해 보세요. (안정적인 오디오 품질을 위해 태그의 연속 사용은 피해주시기 바랍니다.)</p>
           </div>
 
-          {/* 스타일/감정 입력창 */}
-          <div className="flex flex-col space-y-2">
-            <label htmlFor="style-prompt" className="font-semibold text-gray-700">
-              스타일 및 감정 지시어 (Prompt)
-            </label>
-            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} maxLength={1000} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="스타일 및 감정 입력창"/>
-          </div>
+          {options.mode !== "single" && <TtsEditor section="turns" value={options} onChange={setOptions} disabled={isLoading}/>}
+          </section>
 
-          <div role="status" aria-live="polite" className="sr-only">
-            {statusMessage || announcement}
-          </div>
+          <section aria-labelledby="generation-output" className="space-y-4">
+            <h2 id="generation-output" className="text-lg font-bold text-purple-900">4. 출력 설정</h2>
+          <TtsEditor section="output" value={options} onChange={setOptions} disabled={isLoading}/>
+          </section>
 
+          <section aria-labelledby="generation-result" className="space-y-4">
+            <h2 id="generation-result" className="text-lg font-bold text-purple-900">5. 음성 생성과 결과</h2>
           {/* 버튼부 */}
           <button onClick={handleGenerate} disabled={isLoading} className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 ${isLoading
             ? "bg-gray-400 cursor-not-allowed"
@@ -459,9 +552,10 @@ export default function Home() {
 
           {/* 결과물 출력부 */}
           {status !== "idle" && (<div className="mt-8 p-6 bg-white/80 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center space-y-4">
-              <h2 aria-live="polite" className="text-lg font-bold text-gray-700">
+              <p>실제 처리 등급: {TIER_LABELS[actualTier] ?? "미확인"}</p>
+              <h3 aria-live="polite" className="text-lg font-bold text-gray-700">
                 {statusMessage}
-              </h2>
+              </h3>
               <button type="button" disabled={status !== "complete" || !audioUrl} onClick={handleReplay} aria-label="다시 듣기" className="px-6 py-2 rounded-full bg-pink-100 text-pink-600 font-semibold disabled:bg-gray-200 disabled:text-gray-500">
                 다시 듣기
               </button>
@@ -473,6 +567,9 @@ export default function Home() {
                   음성 생성이 끝나면 다운로드할 수 있습니다.
                 </span>)}
             </div>)}
+          </section>
+          </TabPanel>
+          <TimedLiveRegion message={statusMessage || announcement}/>
         </section>
       </div>
     </main>);

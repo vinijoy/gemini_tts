@@ -1,0 +1,230 @@
+{
+  "language": [
+    {
+      "code": "el-GR",
+      "label": "그리스어(그리스)"
+    },
+    {
+      "code": "nl-NL",
+      "label": "네덜란드어(네덜란드)"
+    },
+    {
+      "code": "de-DE",
+      "label": "독일어(독일)"
+    },
+    {
+      "code": "vi-VN",
+      "label": "베트남어(베트남)"
+    },
+    {
+      "code": "sw-KE",
+      "label": "스와힐리어(케냐)"
+    },
+    {
+      "code": "es-419",
+      "label": "스페인어(라틴 아메리카)"
+    },
+    {
+      "code": "es-ES",
+      "label": "스페인어(유럽)"
+    },
+    {
+      "code": "ar-EG",
+      "label": "아랍어(이집트)"
+    },
+    {
+      "code": "en-ZA",
+      "label": "영어(남아프리카)"
+    },
+    {
+      "code": "en-NZ",
+      "label": "영어(뉴질랜드)"
+    },
+    {
+      "code": "en-US",
+      "label": "영어(미국)"
+    },
+    {
+      "code": "en-IE",
+      "label": "영어(아일랜드)"
+    },
+    {
+      "code": "en-GB",
+      "label": "영어(영국)"
+    },
+    {
+      "code": "en-AU",
+      "label": "영어(오스트레일리아)"
+    },
+    {
+      "code": "en-IN",
+      "label": "영어(인도)"
+    },
+    {
+      "code": "en-CA",
+      "label": "영어(캐나다)"
+    },
+    {
+      "code": "it-IT",
+      "label": "이탈리아어(이탈리아)"
+    },
+    {
+      "code": "ja-JP",
+      "label": "일본어(일본)"
+    },
+    {
+      "code": "jv-ID",
+      "label": "자바어(인도네시아)"
+    },
+    {
+      "code": "cs-CZ",
+      "label": "체코어(체코)"
+    },
+    {
+      "code": "ta-IN",
+      "label": "타밀어(인도)"
+    },
+    {
+      "code": "te-IN",
+      "label": "텔루구어(인도)"
+    },
+    {
+      "code": "pt-BR",
+      "label": "포르투갈어(브라질)"
+    },
+    {
+      "code": "pt-PT",
+      "label": "포르투갈어(유럽)"
+    },
+    {
+      "code": "pl-PL",
+      "label": "폴란드어(폴란드)"
+    },
+    {
+      "code": "fr-CA",
+      "label": "프랑스어(캐나다)"
+    },
+    {
+      "code": "fr-FR",
+      "label": "프랑스어(프랑스)"
+    },
+    {
+      "code": "ko-KR",
+      "label": "한국어(대한민국)"
+    },
+    {
+      "code": "ar-001",
+      "label": "현대 표준 아랍어"
+    },
+    {
+      "code": "hi-IN",
+      "label": "힌디어(인도)"
+    }
+  ],
+  "region": [
+    {
+      "code": "GR",
+      "label": "그리스"
+    },
+    {
+      "code": "ZA",
+      "label": "남아프리카"
+    },
+    {
+      "code": "NL",
+      "label": "네덜란드"
+    },
+    {
+      "code": "NZ",
+      "label": "뉴질랜드"
+    },
+    {
+      "code": "KR",
+      "label": "대한민국"
+    },
+    {
+      "code": "DE",
+      "label": "독일"
+    },
+    {
+      "code": "419",
+      "label": "라틴 아메리카"
+    },
+    {
+      "code": "US",
+      "label": "미국"
+    },
+    {
+      "code": "VN",
+      "label": "베트남"
+    },
+    {
+      "code": "BR",
+      "label": "브라질"
+    },
+    {
+      "code": "ES",
+      "label": "스페인"
+    },
+    {
+      "code": "IE",
+      "label": "아일랜드"
+    },
+    {
+      "code": "GB",
+      "label": "영국"
+    },
+    {
+      "code": "AU",
+      "label": "오스트레일리아"
+    },
+    {
+      "code": "EG",
+      "label": "이집트"
+    },
+    {
+      "code": "IT",
+      "label": "이탈리아"
+    },
+    {
+      "code": "IN",
+      "label": "인도"
+    },
+    {
+      "code": "ID",
+      "label": "인도네시아"
+    },
+    {
+      "code": "JP",
+      "label": "일본"
+    },
+    {
+      "code": "001",
+      "label": "전 세계"
+    },
+    {
+      "code": "CZ",
+      "label": "체코"
+    },
+    {
+      "code": "CA",
+      "label": "캐나다"
+    },
+    {
+      "code": "KE",
+      "label": "케냐"
+    },
+    {
+      "code": "PT",
+      "label": "포르투갈"
+    },
+    {
+      "code": "PL",
+      "label": "폴란드"
+    },
+    {
+      "code": "FR",
+      "label": "프랑스"
+    }
+  ]
+}

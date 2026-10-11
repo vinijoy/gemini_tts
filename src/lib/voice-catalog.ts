@@ -18,7 +18,7 @@ export type CatalogVoice = {
     };
     key?: string;
 };
-const descriptions = ["Bright", "Upbeat", "Informative", "Firm", "Excitable", "Youthful", "Firm", "Breezy", "Easy-going", "Bright", "Breathy", "Clear", "Easy-going", "Smooth", "Smooth", "Clear", "Gravelly", "Informative", "Upbeat", "Soft", "Firm", "Even", "Mature", "Forward", "Friendly", "Casual", "Gentle", "Lively", "Knowledgeable", "Warm"];
+const descriptions = ["밝은 느낌", "경쾌한 느낌", "정보 전달에 어울리는 느낌", "단단한 느낌", "들뜬 느낌", "젊은 느낌", "단단한 느낌", "산뜻한 느낌", "편안한 느낌", "밝은 느낌", "숨결이 섞인 느낌", "또렷한 느낌", "편안한 느낌", "매끄러운 느낌", "매끄러운 느낌", "또렷한 느낌", "거친 느낌", "정보 전달에 어울리는 느낌", "경쾌한 느낌", "부드러운 느낌", "단단한 느낌", "고른 느낌", "성숙한 느낌", "적극적인 느낌", "친근한 느낌", "격식 없이 자연스러운 느낌", "온화한 느낌", "생기 있는 느낌", "박식한 느낌", "따뜻한 느낌"];
 export const BASIC_VOICES: CatalogVoice[] = VOICE_NAMES.map((id, i) => ({ id, type: "prebuilt", name: id, description: descriptions[i], languages: [], regions: [], gender: "", accent: [], pitch: "", persona: [], contexts: [] }));
 export const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((s): s is string => typeof s === "string").slice(0, 100) : typeof v === "string" ? [v] : [];
 const text = (v: unknown, max = 4096) => typeof v === "string" ? v.slice(0, max) : "";
