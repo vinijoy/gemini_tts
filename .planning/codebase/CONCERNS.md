@@ -2,6 +2,8 @@
 last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
 refreshed: 2026-10-12
 mapping_scope: incremental-dialogue-only
+named_blocks_mapped_commit: 24afbbf2be923dcde468e6fb27d389560af961d5
+named_blocks_mapped_paths: [src/lib/dialogue-blocks.ts, src/lib/tts-contract.ts, src/lib/gemini-tts.ts, src/lib/gemini-tts.test.ts, src/app/page.test.tsx, src/app/generation-order.test.tsx]
 mapped_paths:
   - src/lib/tts-contract.ts
   - src/lib/gemini-tts.ts
@@ -51,12 +53,18 @@ mapped_paths:
 ## Performance Bottlenecks
 
 **순차 대화·재시도의 총 소요 시간:**
-- Problem: 모든 모드의 대사별 요청·직접 API 장문 분할과 재시도는 개별 요청 시간 제한보다 전체 소요 시간이 길어질 수 있다.
+- Problem: prebuilt 블록별 요청·custom 발화별 요청·이름 없는 직접 API 장문 분할과 재시도는 개별 요청 시간 제한보다 전체 소요 시간이 길어질 수 있다.
 - Files: `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`
 - Cause: 일반 upstream 요청은 120초 timeout을 적용하고 분당 429는 1~65초 대기한다. 전체 대화 총 시간 제한은 별도다.
 - Improvement path: 실제 응답 시간을 측정한 뒤 전체 요청 deadline과 진행 안내를 검토한다.
 
 ## Fragile Areas
+
+**입력 블록과 발화의 구분 (부분 갱신 2026-10-12, `24afbbf`):**
+- Files: `src/lib/dialogue-blocks.ts`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.ts`, `src/app/components/TtsEditor.tsx`
+- Why fragile: 한 칸에 여러 이름이 올 수 있어 블록 전체에 선택 화자 하나를 강제하면 다른 목소리를 잃는다. 이름 해석과 일반 본문 구분은 별도 회귀가 필요하다.
+- Safe modification: 사용자 이름과 A/B 별칭을 유지한다. prebuilt는 블록의 여러 parts와 두 voice configs, custom은 발화별 single voice, 공통으로 블록 연출을 유지한다. 이름 있는 계획 단위의 예산 초과는 사전 거부한다.
+- Test coverage: `src/lib/gemini-tts.test.ts`, `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`에서 두 다화자 블록·역순 시작·다른 연출·이름 검증을 함께 확인한다. `named_blocks_mapped_paths`만 갱신했으며 기존 전체 매핑 범위는 유지한다. 실제 모델 음성·새 필드 VoiceOver/NVDA는 대기다.
 
 **PCM 스트림과 브라우저 재생 수명 주기:**
 - Files: `src/lib/gemini-tts.ts`, `src/utils/audio-format.ts`, `src/app/page.tsx`, `src/utils/streaming-player.ts`
@@ -75,8 +83,8 @@ mapped_paths:
 **독립 요청 사이의 음질·모델 수용:**
 - Files: `src/lib/gemini-tts.ts`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.test.ts`
 - Risk: 독립 요청 사이 억양·목소리·언어·연출 일관성은 mock PCM 결합으로 확인할 수 없다. 18,000-byte 앱 예산은 공식 토큰 계산이나 provider 수용 보증이 아니다.
-- Current mitigation: 원래 대사·연출 경계를 유지하고 전체 계획을 사전 검증한다. 직접 API 장문은 grapheme·완전한 태그·공백을 보존한다.
-- Follow-up: 실제 모델 청취·이번 변경의 VoiceOver/NVDA는 `.planning/quick/261012-atd-dialogue-chunking/261012-atd-SUMMARY.md`, `.planning/ui-followup.md`의 대기 범위를 따른다.
+- Current mitigation: 블록의 이름별 발화·연출을 유지하고 전체 계획을 사전 검증한다. 이름 없는 직접 API 장문은 grapheme·완전한 태그·공백을 보존한다.
+- Follow-up: 실제 모델 청취·새 이름 필드와 오류 안내 VoiceOver/NVDA는 `.planning/quick/261012-boh-named-speaker-blocks/261012-boh-SUMMARY.md`, `.planning/ui-followup.md`의 대기 범위를 따른다.
 
 ## Dependencies at Risk
 

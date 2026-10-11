@@ -2,6 +2,8 @@
 last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
 refreshed: 2026-10-12
 mapping_scope: incremental-dialogue-only
+named_blocks_mapped_commit: 24afbbf2be923dcde468e6fb27d389560af961d5
+named_blocks_mapped_paths: [src/lib/dialogue-blocks.ts, src/lib/tts-contract.ts, src/lib/gemini-tts.ts, src/lib/gemini-tts.test.ts, src/app/page.test.tsx, src/app/generation-order.test.tsx]
 mapped_paths:
   - src/lib/tts-contract.ts
   - src/lib/gemini-tts.ts
@@ -96,7 +98,9 @@ async function* responses() {
 - `src/lib/gemini-tts.test.ts`: 합산 본문 1,000자·연출 4,000자 초과와 21턴 허용, 짧은 수동 대사도 분리, 두 모델×세 모드의 직접 API 장문 무손실 분할·연출 보존·요청별 예산을 검사한다.
 - `src/app/api/tts/route.test.ts`: 1MiB/128개 계획의 사전 거부, 최대 voice ref와 한글 본문·연출 1,000자씩 128행 허용, 4형식×3rate, 32MiB 누적 경계/초과, 뒤 요청 실패·대기 reader 취소·그룹별 PCM 경계를 검사한다.
 - `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`: Home→실제 POST→mock provider의 독립 대사·연출과 완성 WAV, 21행·입력칸별 maxlength, DOM 순서·탭 보존, 뒤 실패·용량 초과 시 완성 파일 부재를 검사한다. 자동 조각 편집 UI 계약은 없다.
-- `.planning/quick/261012-atd-dialogue-chunking/261012-atd-SUMMARY.md`에 18파일 177 tests·lint·TypeScript·production build 통과가 기록되어 있다. 이 지도 갱신에서 재실행하지 않았으며 실제 유료 음성·경계 청취·이번 VoiceOver/NVDA는 대기다.
+- `src/lib/gemini-tts.test.ts`: 두 블록 모두 다화자이며 둘째는 B→A로 시작하는 fixture로 prebuilt의 두 voice configs·여러 speaker parts·블록별 다른 연출과 custom 발화별 single voice 순서를 확인한다. 이름·A/B 별칭, trim/NFC·CRLF·태그·공백, 이름 없는 선택 화자 fallback, 중복·충돌·미등록 이름·빈 발화 검증을 포함한다. 블록을 단일 발화로 가정하지 않는다.
+- `src/app/page.test.tsx`: Home→실제 POST→mock provider에서 두 블록의 A/B·B/A 순서·연출·PCM/WAV, 뒤 블록 미등록 이름의 upstream 0회와 입력 보존을 검사한다. `src/app/generation-order.test.tsx`는 이름 필드 순서와 모델·모드·탭 왕복 보존을 검사한다.
+- **부분 갱신 체크포인트 (2026-10-12, `24afbbf`):** `.planning/quick/261012-boh-named-speaker-blocks/261012-boh-SUMMARY.md`에 18파일 198 tests·lint·TypeScript·production build 통과가 기록되어 있다. `named_blocks_mapped_paths`만 부분 반영했으며 이 지도 갱신에서는 재실행하지 않았다. 후속 변경의 최종 검증으로 확대하지 않는다. 실제 유료 음성·양 모델 청취·새 이름 필드와 오류 안내 VoiceOver/NVDA는 대기다.
 
 ## 커버리지
 

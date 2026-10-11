@@ -2,6 +2,8 @@
 last_mapped_commit: 230a8461a5a81f6aa9fa4449a4732de4b96b9d0a
 refreshed: 2026-10-12
 mapping_scope: incremental-dialogue-only
+named_blocks_mapped_commit: 24afbbf2be923dcde468e6fb27d389560af961d5
+named_blocks_mapped_paths: [src/lib/dialogue-blocks.ts, src/lib/tts-contract.ts, src/lib/gemini-tts.ts, src/app/components/TtsEditor.tsx, src/app/page.tsx]
 mapped_paths:
   - src/lib/tts-contract.ts
   - src/lib/gemini-tts.ts
@@ -100,7 +102,7 @@ Gemini 3.8 REST v1beta → SSE / Voices
 
 1. `src/app/page.tsx`가 `parseTts`로 요청 snapshot을 검증하고 재생기를 활성화한다.
 2. `src/app/api/tts/route.ts`가 `readJson`·`parseTts`를 실행하고 `openPcm`을 호출한다.
-3. `src/lib/gemini-tts.ts`가 모든 모드의 원래 대사를 자신의 화자·연출을 유지한 독립 요청으로 사전 계획하고 순차 실행한다. prebuilt 대화는 두 화자 설정, custom 대화는 해당 화자의 single 설정을 유지한다. 직접 API 장문은 grapheme·완전한 태그·공백을 보존하며 분할하고 같은 연출을 반복한다.
+3. `src/lib/dialogue-blocks.ts`의 `dialogueParts`가 입력 블록을 이름별 발화로 해석한다. `src/lib/gemini-tts.ts`는 prebuilt 블록의 모든 발화를 한 요청의 여러 parts로 보내며 시작 화자와 무관하게 설정된 두 voice configs를 보낸다. custom 대화는 발화마다 대응하는 single voice로 순차 요청한다. 각 발화는 블록의 연출을 그대로 받는다. 이름 선언 없는 직접 API 장문은 grapheme·완전한 태그·공백을 보존해 분할한다. 이름 있는 계획 단위가 요청 예산을 넘으면 사전 거부한다.
 4. SSE를 읽어 종료 사유·Base64·MIME·rate를 검사한다. WAV는 전체 컨테이너 검증 후, L16/G.711은 청크별 PCM으로 전달한다.
 5. `src/app/page.tsx`는 청크 경계를 조립하고 요청 샘플레이트(8/16/24kHz)로 재생한다. 완료 PCM에서 WAV와 선택 형식 다운로드를 만든다.
 
@@ -120,6 +122,10 @@ Gemini 3.8 REST v1beta → SSE / Voices
 ## 주요 추상화
 
 - `TtsRequest`/`parseTts` (`src/lib/tts-contract.ts`): 구조화한 모델·화자·발화·출력 계약과 기존 text/voice 입력 호환.
+- `speakerAliases`/`dialogueParts` (`src/lib/tts-contract.ts`, `src/lib/dialogue-blocks.ts`): 선택적 `speaker.name`을 trim/NFC 비교해 화자 ID로 연결한다. UI A/B 별칭을 함께 유지하며 이름은 하드코딩하지 않는다. 선언 전 본문은 블록의 선택 화자, 선언 뒤 이어지는 줄은 직전 화자를 따른다. 이름 선언과 바로 뒤 구분 공백 한 칸만 제거하고 본문·CRLF·태그·연출은 보존한다.
+- 화자 이름 입력 (`src/app/components/TtsEditor.tsx`, `src/app/page.tsx`): 두 화자 모드의 선택적 대본 이름을 제공한다. 입력 블록 하나를 단일 발화로 가정하지 않는다.
+
+**부분 갱신 (2026-10-12, `24afbbf`):** `named_blocks_mapped_paths`의 이름별 블록 계약만 반영했다. 기존 매핑 범위와 전체 분석 기준은 유지한다.
 - `wireRequest`/`requestGroups`/`openPcm` (`src/lib/gemini-tts.ts`): REST 직렬화, 대화 실행 단위, Web Stream과 AbortSignal 경계.
 - `AppError`/`errorResponse` (`src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`): HTTP 상태와 공개 가능한 오류 메시지.
 - `voiceRef` (`src/lib/voice-catalog.ts`): 기본 이름·확장 ID·저장 custom·비저장 replica 참조 구분.
