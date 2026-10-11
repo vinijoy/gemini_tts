@@ -24,6 +24,12 @@ it("plain dialogue keeps fallback voice and URLs, timestamps and mid-sentence co
  const r=dialogue();const block={speaker:"B",text:"https://example.test:8080\n12:30 오후\n대사, 설명: 그대로\n",style:" 연출 "};
  expect(dialogueParts(r,block,0)).toEqual({parts:[block],named:false});
 });
+it("registered numeric names take precedence over timestamp detection",()=>{
+ const r=dialogue();r.speakers[0].name="12";
+ const block={speaker:"B",text:"12:30분 뒤에 만나자",style:" 숫자 이름 연출 "};
+ expect(dialogueParts(parseTts(r),block,0)).toEqual({parts:[{...block,speaker:"A",text:"30분 뒤에 만나자"}],named:true});
+ expect(dialogueParts(dialogue(),block,0)).toEqual({parts:[block],named:false});
+});
 it.each(MODELS.flatMap(model=>["prebuilt-dialogue","custom-dialogue"].map(mode=>({model,mode:mode as TtsRequest["mode"]}))))("stable A/B aliases remain valid with display names: $model/$mode",({model,mode})=>{
  const r=dialogue(mode);r.model=model;r.speakers[0].name="수아";r.speakers[1].name="민재";r.turns=[{speaker:"A",text:"B: 먼저\nA: 다음",style:" 원문 연출 "}];
  const groups=requestGroups(parseTts(r));expect(groups).toHaveLength(mode==="prebuilt-dialogue"?1:2);
