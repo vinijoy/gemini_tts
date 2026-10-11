@@ -28,10 +28,22 @@
 - [ ] **SAFE-01**: 잘못된 입력·업스트림 오류는 한국어로 처리하고 API 키·외부 오류 본문을 노출하지 않는다. 새 네트워크 작업은 취소와 자원 상한을 갖춘다.
 - [ ] **A11Y-01**: 사용자는 키보드로 새 기능을 조작하고 레이블·상태·오류를 스크린리더로 확인할 수 있다. 실기 미확인은 별도 기록한다.
 
+### 처리 등급
+
+- [ ] **SERVICE-01**: 사용자는 공식 지원 범위에서 Standard, Flex, Priority 처리 등급을 선택하며, 앱은 비용·대기 차이를 안내하고 선택한 등급을 조용히 바꾸거나 유료 재호출하지 않는다.
+- [ ] **SERVICE-02**: 사용자는 요청한 처리 등급과 응답에서 확인된 실제 처리 등급을 구분할 수 있고, 실제 등급을 확인할 수 없으면 미확인으로 안내받는다.
+
+### Batch 음성 합성
+
+- [ ] **BATCH-01**: 사용자는 여러 TTS 요청을 하나의 공식 Batch 작업으로 제출할 수 있고, 모델·목소리·대본 검증과 앱의 inline 입력 크기 제한을 확인할 수 있다.
+- [ ] **BATCH-02**: 사용자는 Batch 작업 목록과 상태를 조회하고, 저장한 작업 식별자로 다시 열어 완료·실패·취소·만료 여부를 확인할 수 있다.
+- [ ] **BATCH-03**: 사용자는 지원되는 Batch 작업을 명시적으로 취소·삭제하거나 작업 내부 우선순위를 조정할 수 있고, 허용되지 않는 상태와 실패 이유를 안내받는다. Batch 내부 우선순위는 Priority 처리 등급과 구분한다.
+- [ ] **BATCH-04**: 사용자는 완료된 Batch의 요청별 성공 음성을 재생·WAV 저장하고 개별 실패를 확인할 수 있으며, inline 및 파일 기반 결과를 요청 식별자로 대응시킬 수 있다.
+
 ### 근거와 검증
 
 - [ ] **DOC-01**: 구현에 사용한 공식 원문 전체와 버전을 보관하고 기능별 구현·검증·제약 표를 남긴다.
-- [ ] **TEST-01**: 모델·요청 스키마·화자 처리·음성 관리·오디오 형식·오류·취소 회귀 검사가 통과한다. 실제 호출·청취와 mock 검사를 구분한다.
+- [ ] **TEST-01**: 모델·요청 스키마·화자 처리·음성 관리·오디오 형식·처리 등급·Batch·오류·취소 회귀 검사가 통과한다. 실제 호출·청취와 mock 검사를 구분한다.
 
 ## v2 Requirements
 
@@ -47,7 +59,32 @@
 
 ## Traceability
 
-로드맵 생성 시 모든 v1 요구사항을 정확히 한 단계에 연결한다. Quick 구현 후 단계 수용은 자동 완료 처리하지 않는다.
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| TTS-01 | Phase 1 | Pending |
+| TTS-02 | Phase 1 | Pending |
+| TTS-03 | Phase 1 | Pending |
+| TTS-04 | Phase 2 | Pending |
+| VOICE-01 | Phase 1 | Pending |
+| VOICE-02 | Phase 2 | Pending |
+| VOICE-03 | Phase 2 | Pending |
+| VOICE-04 | Phase 2 | Pending |
+| VOICE-05 | Phase 2 | Pending |
+| VOICE-06 | Phase 1 | Pending |
+| AUDIO-01 | Phase 1 | Pending |
+| AUDIO-02 | Phase 2 | Pending |
+| SERVICE-01 | Phase 2 | Pending |
+| SERVICE-02 | Phase 2 | Pending |
+| BATCH-01 | Phase 2 | Pending |
+| BATCH-02 | Phase 2 | Pending |
+| BATCH-03 | Phase 2 | Pending |
+| BATCH-04 | Phase 2 | Pending |
+| SAFE-01 | Phase 1 | Pending |
+| A11Y-01 | Phase 3 | Pending |
+| DOC-01 | Phase 3 | Pending |
+| TEST-01 | Phase 3 | Pending |
+
+**Coverage:** 22/22 v1 requirements mapped; no orphans or duplicates.
 
 ---
-*Last updated: 2026-10-11 after requirements definition*
+*Last updated: 2026-10-11 after roadmap creation*
