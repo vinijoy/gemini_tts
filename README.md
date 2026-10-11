@@ -1,6 +1,6 @@
 # Gemini 3.8 TTS
 
-한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. 서버의 `GEMINI_API_KEY` 또는 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20 이상에서 `npm ci`, `npm run dev`로 시작한 뒤 http://localhost:3000 을 여세요.
+한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. zsh에서 export한 `GEMINI_API_KEY`를 우선 사용하고, 값이 없을 때만 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20 이상에서 `npm ci`, `npm run dev`로 시작한 뒤 http://localhost:3000 을 여세요.
 
 ## 대본과 음성 생성
 

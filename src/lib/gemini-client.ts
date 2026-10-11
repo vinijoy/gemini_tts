@@ -3,7 +3,8 @@ import { AppError } from "./tts-contract";
 const HOST = "https://generativelanguage.googleapis.com";
 export function apiKey(): string {
     let key = process.env.GEMINI_API_KEY;
-    try {
+    // 셸에서 전달된 키를 로컬 파일로 덮어쓰지 않는다.
+    if (!key) try {
         const line = readFileSync(".env.local", "utf8").match(/^\s*(?:export\s+)?GEMINI_API_KEY\s*=\s*(.*?)\s*$/m)?.[1];
         if (line)
             key = line.replace(/^(['"])(.*)\1$/, "$2");

@@ -65,7 +65,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 ### Blockers/Concerns
 
 - VOICE-03 Remix: 공개 요청 스키마 부재로 열린 상태. 다른 생성 기능을 Remix로 대체하지 않는다.
-- 읽기 전용 catalog GET은 HTTP 400 / API_KEY_INVALID였다. 현재 키의 실제 기능 접근은 미검증이며 제공 목록의 출처와 분리한다.
+- 후속 키 우선순위 수정: 이전 HTTP 400 / API_KEY_INVALID는 .env.local이 셸 키를 덮어쓴 상태의 결과였다. 2026-10-11 zsh GEMINI_API_KEY 우선 적용 후 최소 읽기 전용 catalog GET HTTP 200 확인. 실제 음성 생성·계정별 다른 기능은 미검증이다. 회귀 포함 134 tests, lint, tsc 통과.
 - 실제 음성 청취와 스크린리더 수용은 아직 수행하지 않았다. 모든 요구사항과 단계는 미완료다.
 - native api-coverage.verify-pre는 quick 경로에서 phase_lookup_failed를 반환했다. 계획 파일 자체의 frontmatter/structure 검증은 통과했으며 API coverage 게이트 통과를 주장하지 않는다.
 - phase closeout guard는 초기화 직후 PLAN 없는 단계의 snapshot을 지원하지 않았다. 어떤 단계도 완료 처리하지 않았으며 guard 통과를 주장하지 않는다.
