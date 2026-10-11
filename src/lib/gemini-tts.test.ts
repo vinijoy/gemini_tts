@@ -10,6 +10,22 @@ function dialogue(mode:TtsRequest["mode"]="prebuilt-dialogue"):TtsRequest {
  return {model:MODELS[0],mode,speakers:[{id:"A",voice:{kind:"prebuilt-name",value:"Puck"}},{id:"B",voice:{kind:"prebuilt-name",value:"Kore"}}],turns:[{speaker:"A",text:"가".repeat(700),style:"  다정하게\n"},{speaker:"B",text:"나".repeat(700),style:" 힘차게 "}],output:{encoding:"AUDIO_L16",sampleRate:24000},serviceTier:"standard"};
 }
 function pcmResponse(sample=1){return new Response(`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:"audio/l16;rate=24000",data:Buffer.from([sample,0]).toString("base64")}}]},finishReason:"STOP"}]})}\n\n`);}
+it("named dialogue blocks keep both configured voices and stable speakers when the second block starts with B",async()=>{
+ const r={...dialogue(),speakers:dialogue().speakers.map((s,i)=>({...s,name:i?"민재":"수아"})),turns:[
+  {speaker:"A",text:"수아: 내 그 말 때문에 진짜 많이 버텼다.\n\n민재: 야, 갑자기 와 이라노.",style:" 첫 칸 연출\n"},
+  {speaker:"B",text:"민재: 두 번째 칸 시작.\n수아: 그 다음 대사.",style:" 뒤 칸 연출 "},
+ ]};
+ const calls=vi.fn().mockImplementation(()=>Promise.resolve(pcmResponse(calls.mock.calls.length)));vi.stubGlobal("fetch",calls);
+ const response=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
+ expect(response.status).toBe(200);expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1,0,2,0]));
+ expect(calls).toHaveBeenCalledTimes(2);
+ const wires=calls.mock.calls.map(([,init])=>JSON.parse(init.body));
+ expect(wires.map(w=>w.contents[0].parts)).toEqual([
+  [{text:"내 그 말 때문에 진짜 많이 버텼다.\n\n",speechMetadata:{speaker:"A",style:r.turns[0].style}},{text:"야, 갑자기 와 이라노.",speechMetadata:{speaker:"B",style:r.turns[0].style}}],
+  [{text:"두 번째 칸 시작.\n",speechMetadata:{speaker:"B",style:r.turns[1].style}},{text:"그 다음 대사.",speechMetadata:{speaker:"A",style:r.turns[1].style}}],
+ ]);
+ for(const w of wires)expect(w.generationConfig.speechConfig.multiSpeakerVoiceConfig.speakerVoiceConfigs).toEqual([{speaker:"A",voiceConfig:{voice:"Puck"}},{speaker:"B",voiceConfig:{voice:"Kore"}}]);
+});
 it("POST accepts 1,400 dialogue characters and joins sequential PCM with verbatim directions",async()=>{
  const calls=vi.fn().mockImplementation(()=>Promise.resolve(pcmResponse(calls.mock.calls.length)));
  vi.stubGlobal("fetch",calls);
