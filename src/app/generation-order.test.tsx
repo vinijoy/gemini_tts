@@ -44,7 +44,7 @@ it("대화 목소리는 함께 선택하고 추가 발화는 첫 대본 다음�
   await user.selectOptions(screen.getByLabelText("화자 모드"), "prebuilt-dialogue");
   const voices = screen.getByRole("region", {name: "2. 목소리 선택"});
   expect(within(voices).getByLabelText("화자 B 기본 목소리")).toBeVisible();
-  await user.click(screen.getByRole("button", {name: "발화 추가"}));
+  await user.click(screen.getByRole("button", {name: "대사 추가"}));
   await user.type(screen.getByLabelText("발화 2 대본"), "두 번째 대본");
   expectOrder([
     screen.getByLabelText("화자 B 기본 목소리"), screen.getByLabelText("음성으로 변환할 텍스트 입력창"),
@@ -58,4 +58,17 @@ it("대화 목소리는 함께 선택하고 추가 발화는 첫 대본 다음�
   expect(screen.getByLabelText("스타일 및 감정 입력창")).toHaveValue("차분하게");
   expect(screen.getByLabelText("발화 2 대본")).toHaveValue("두 번째 대본");
   expect(vi.mocked(fetch).mock.calls.every(([url]) => String(url).startsWith("/api/voices?"))).toBe(true);
+});
+
+
+it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 두 화자 대화임을 명시하고 합산 제한을 설명한다", async (mode) => {
+  const user = userEvent.setup();
+  render(<Home />);
+  expect(screen.queryByRole("button", {name: "대사 추가"})).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("화자 모드"), mode);
+  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("두 화자의 대사를 합쳐 최대 1,000자까지 입력할 수 있습니다.");
+  expect(screen.queryByText(/첫 발화는 위 대본과 연출|위의 대본과 말투는 첫 번째 화자/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", {name: "대사 추가"}));
+  expect(screen.getByLabelText("발화 2 화자")).toHaveValue("B");
+  expect(screen.getByLabelText("발화 2 대본")).toBeVisible();
 });

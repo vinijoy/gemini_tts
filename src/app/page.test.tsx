@@ -81,7 +81,7 @@ it("모든 탭의 선택 메뉴와 열린 검색·두 화자·추가 발화 설�
     await user.selectOptions(screen.getByLabelText("음성 선택"), "Puck");
     await user.selectOptions(screen.getByLabelText("화자 모드"), "prebuilt-dialogue");
     await user.selectOptions(screen.getByLabelText("화자 B 기본 목소리"), "Aoede");
-    await user.click(screen.getByRole("button", {name: "발화 추가"}));
+    await user.click(screen.getByRole("button", {name: "대사 추가"}));
     await user.selectOptions(screen.getByLabelText("발화 2 화자"), "A");
     await user.type(screen.getByLabelText("발화 2 대본"), "둘째 발화");
     await user.selectOptions(screen.getByLabelText("샘플레이트"), "16000");
