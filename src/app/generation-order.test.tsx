@@ -61,12 +61,12 @@ it("대화 목소리는 함께 선택하고 추가 발화는 첫 대본 다음�
 });
 
 
-it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 두 화자 대화임을 명시하고 합산 제한을 설명한다", async (mode) => {
+it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 두 화자 대화와 자동 분할·연출 보존을 설명한다", async (mode) => {
   const user = userEvent.setup();
   render(<Home />);
   expect(screen.queryByRole("button", {name: "대사 추가"})).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("화자 모드"), mode);
-  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("두 화자의 대사를 합쳐 최대 1,000자까지 입력할 수 있습니다.");
+  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("각 대사의 연출은 나눈 구간마다 동일하게 적용됩니다.");
   expect(screen.queryByText(/첫 발화는 위 대본과 연출|위의 대본과 말투는 첫 번째 화자/)).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", {name: "대사 추가"}));
   expect(screen.getByLabelText("발화 2 화자")).toHaveValue("B");
