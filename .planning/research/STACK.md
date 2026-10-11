@@ -5,6 +5,27 @@
 **범위:** 기존 앱을 유지하면서 Gemini 3.8 TTS 기능에 필요한 SDK·API 선택  
 **신뢰도:** MEDIUM — GSD `classify-confidence --provider context7 --verified` 결과. 공식 문서·npm 배포물을 교차 확인했지만 인증 API·유료 합성은 실행하지 않았다.
 
+## Package Legitimacy Audit
+
+2026-10-11에 이미 확인한 npm metadata·공식 문서·배포물을 정리한 검토다. 추가 설치·실행·인증 요청은 하지 않았다.
+
+| 검토 항목 | 확인 결과 | 근거·제한 |
+|---|---|---|
+| 패키지명·생태계 | `@google/genai`, npm | 기존 잠금 파일 및 공식 Google 가이드와 일치 |
+| 공식 SDK 대응 | 확인 | 공식 가이드가 해당 패키지를 안내하며 npm `repository.url`은 `git+https://github.com/googleapis/js-genai.git` |
+| 권장 버전 실제 존재 | 2.28.0 | npm latest·exact-version metadata·tarball 확인 |
+| 최소 버전 실제 존재 | 2.24.0 | 공식 Voices 최소 요구와 npm metadata 대조 |
+| 배포 시각 | 2.24.0: 2026-09-22 / 2.28.0: 2026-10-07 UTC | registry time 필드. 상세 시각은 아래 표 참조 |
+| 배포물 출처 | `https://registry.npmjs.org/@google/genai/-/genai-2.28.0.tgz` | exact-version dist.tarball 경로 |
+| API 적합성 | 부분 확인 | 실제 타입·직렬화 코드에서 speechMetadata·voiceConfig.voice·Voices 확인. responseFormat 불일치는 아래 기록 |
+| 런타임 요구 | Node >=20.0.0 | 두 버전 engines 확인. 현재 실행 환경 충족 여부는 이 조사에서 미확인 |
+| 서명·provenance·무결성 재검증 | 미확인 | 서명 검증 및 dist.integrity 독립 재계산 미실행 |
+| npm 소유자·maintainer 명단 | 미확인 | 공식 저장소 대응을 소유자 신원 검증으로 확대하지 않음 |
+| 종속성·취약점·라이선스 감사 | 미실행 | 출처·버전·API 검토이며 보안 감사 통과를 의미하지 않음 |
+| 판정 | 공식 SDK 채택 근거 충족, MEDIUM | 정확 패키지·버전 선택. 실제 요청 전송은 구현 단계 mock 검증 필요 |
+
+보관 근거: `docs/google-genai/sdk-2.28.0-types.md`, `docs/google-genai/sdk-2.28.0-readme.md`. 공식·npm 출처 링크는 이 문서의 출처 절을 참조한다.
+
 ## 권장 결정
 
 기존 Next.js/React/Web Audio를 유지하고 **`@google/genai@2.28.0`으로 정확히 고정**한다. 공식 가이드는 Voices 기능에 2.24.0 이상을 요구하며 npm에서 실제 배포를 확인했다. 2.28.0 배포물 타입·직렬화 코드를 읽어 `speechMetadata`, `voiceConfig.voice`, `ai.voices`를 대조했다.

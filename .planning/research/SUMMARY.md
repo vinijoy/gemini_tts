@@ -35,7 +35,7 @@ Models camelCase / Voices snake_case는 어댑터에서 변환하고 생성 요�
 
 **요청된 확장 기능:** 기본 최대 두 화자·턴별 연출·맞장구, custom 순차 대화, Voice Design·반환 미리듣기·관리, Replication·원본/동의 녹음·저장 모드·만료, L16/WAV/μ-law/A-law·rate 선택, Batch/Flex/Priority. 차별화 기능이라는 분류는 제외 승인이 아니다.
 
-**명세 확인 대기:** Remix의 base_voice 위치·형식. Batch/처리 등급 보충은 coordinator가 검증 중이며 FEATURES 부록을 요구사항 확정 시 함께 반영한다. 이 요약은 아직 그 부록을 열람하지 않았다.
+**명세 확인 대기:** Remix의 base_voice 위치·형식. Batch/처리 등급 계약은 FEATURES 부록에 보강했고 ROADMAP·REQUIREMENTS·quick 계획에 반영했다. 서비스 등급의 실제 계정 권한·요금·응답은 호출 검증하지 않았다.
 
 **Defer / 범위 밖:** 생성 이력·BGM·계정 시스템. 배포·push·main 병합은 요청 없음. 공식 TTS 기능을 편의상 v2로 넘기는 승인은 없다.
 
@@ -115,5 +115,5 @@ Models camelCase / Voices snake_case는 어댑터에서 변환하고 생성 요�
 PROJECT.md, research/STACK.md·FEATURES.md·ARCHITECTURE.md·PITFALLS.md, 해당 연구가 열람한 codebase/ARCHITECTURE.md·STACK.md·CONCERNS.md 및 합성·재생 코드. 이 요약 자체는 소스 재감사·인증 호출·유료 합성을 실행하지 않았다.
 
 ---
-*Research completed: 2026-10-11; Batch/처리 등급 보충 반영 대기*
+*Research completed: 2026-10-11; Batch/처리 등급 보충 반영 완료, 사용자 요청으로 구현 미착수*
 *Ready for roadmap: yes — 명세 공백과 미검증 항목을 열린 요구사항으로 보존*

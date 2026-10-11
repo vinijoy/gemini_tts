@@ -151,12 +151,12 @@ Voices/store 명시 → Design/preview/list/get/delete → Replication/동의/�
 | 우선 처리 Priority | `serviceTier: ServiceTier.PRIORITY` | `service_tier:"priority"` | Tier 2/3 사용자 대상, 추가 비용, 서버에서 standard로 강등 가능 |
 | 일괄 처리 Batch | 위 serviceTier에 batch를 넣지 않음 | 별도 `models/{model}:batchGenerateContent` | 비동기 작업·목록·상태·결과 제공 |
 
-설치 SDK 2.28.0 `ServiceTier` enum은 `unspecified/flex/standard/priority`. TypeScript에서는 enum 상수를 사용한다. SDK `GenerateContentConfig.serviceTier`는 전송 때 요청 **최상위 serviceTier**로 매핑하며 `generationConfig` 안에 들어가지 않는다. 공식 REST 예제는 proto 허용 snake_case `service_tier`를 쓴다. Interactions 방식은 최상위 `service_tier`다. TTS의 contents/speechConfig/responseFormat은 기존 계약 그대로 유지한다. [S10–S12]
+다운로드한 공식 SDK 2.28.0 배포물 `ServiceTier` enum은 `unspecified/flex/standard/priority`. TypeScript에서는 enum 상수를 사용한다. SDK `GenerateContentConfig.serviceTier`는 전송 때 요청 **최상위 serviceTier**로 매핑하며 `generationConfig` 안에 들어가지 않는다. 공식 REST 예제는 proto 허용 snake_case `service_tier`를 쓴다. Interactions 방식은 최상위 `service_tier`다. TTS의 contents/speechConfig/responseFormat은 기존 계약 그대로 유지한다. [S10–S12]
 
 - [ ] Flex는 `generateContentStream` 공식 예제도 있으므로 기존 스트림 경로에서 선택 가능하다. 요청별 `config.httpOptions.timeout` 단위는 **밀리초**다. 가이드는 큐 대기용 10분 이상 timeout을 권장한다. 스트림 60초 예제와 권고가 다르므로 예제 숫자를 제품 강제 상한으로 복사하지 않는다. 기존 서버/호스팅 제한과 취소는 별도다. [S10]
 - [ ] Flex 부족 시 503 또는 429. 서버는 예상치 못한 비용을 막기 위해 standard로 자동 상향하지 않는다. 앱도 비용을 바꾸는 fallback을 조용히 수행하지 않는다. 재시도는 취소 가능하고 첫 PCM 이전에만 기존 제한 안에서 한다. 큐 대기·일반 요청과 동일 rate limit임을 안내한다. [S10]
 - [ ] Priority는 Tier 2/3, 기본 rate limit은 해당 model/tier standard의 0.3배이며 전체 interactive traffic 제한에도 포함된다. 초과 트래픽은 서버에서 standard로 처리하고 standard 요금 적용. `x-gemini-service-tier` 응답 헤더로 실제 등급을 표시한다. [S11]
-- [ ] **SDK 가이드 오류 방지:** 설치 2.28.0 `sdkHttpResponse.headers`는 `Record<string,string>`이다. `headers?.['x-gemini-service-tier']`로 읽으며 가이드의 `.headers.get()`를 그대로 복사하지 않는다. 헤더 없으면 ‘실제 등급 미제공’으로 두고 요청 등급을 실제 등급으로 위장하지 않는다. [S11,S12]
+- [ ] **SDK 가이드 오류 방지:** 배포물 2.28.0 `sdkHttpResponse.headers`는 `Record<string,string>`이다. `headers?.['x-gemini-service-tier']`로 읽으며 가이드의 `.headers.get()`를 그대로 복사하지 않는다. 헤더 없으면 ‘실제 등급 미제공’으로 두고 요청 등급을 실제 등급으로 위장하지 않는다. [S11,S12]
 - [ ] 가격 표는 Flex/Batch 표준 대비 50%, Priority 75–100% 추가라는 일반 설명이다. 모델별 정확한 금액·프로젝트별 비용을 추정하지 않는다. 사용자가 가격·지연 설명을 보고 선택한 값만 전송한다. [S8,S10,S11]
 
 ## Batch 구현 계약 — 생성부터 결과까지
@@ -225,7 +225,7 @@ Webhooks `batch.succeeded/batch.failed`와 batch.webhookConfig.uris는 polling �
 
 ## Remix 재확인 결과
 
-설치 @google/genai 2.28.0 `dist/genai.d.ts`에 `base_voice|baseVoice|remix` 정확 검색 결과 **0개**. S7의 OpenAPI PromptedVoice.properties는 input 한 개이며 base_voice 필드는 없다. 따라서 요청 위치를 추정할 수 없고 **구현 차단 사유는 공개 요청 스키마 부재**다. 단순 설명 변경으로 새 Design을 만드는 기능을 remix라고 부르지 않는다. [S7,S12]
+다운로드한 @google/genai 2.28.0 배포물 `dist/genai.d.ts`에 `base_voice|baseVoice|remix` 정확 검색 결과 **0개**. S7의 OpenAPI PromptedVoice.properties는 input 한 개이며 base_voice 필드는 없다. 따라서 요청 위치를 추정할 수 없고 **구현 차단 사유는 공개 요청 스키마 부재**다. 단순 설명 변경으로 새 Design을 만드는 기능을 remix라고 부르지 않는다. [S7,S12]
 
 ## 보강 Sources
 
@@ -233,4 +233,4 @@ Webhooks `batch.succeeded/batch.failed`와 batch.webhookConfig.uris는 polling �
 - [S9] [Batch API reference](https://ai.google.dev/api/batch-mode), `docs/google-gemini/batch-api-reference.md`, 전체 HTML 등록·보관. Operation/InputConfig/InlinedResponses/BatchState/취소 HTTP/priority.
 - [S10] [GenerateContent Flex](https://ai.google.dev/gemini-api/docs/generate-content/flex-inference), `docs/google-gemini/flex-inference.md`, 전체 HTML 등록·보관. serviceTier·streaming·timeout·오류·fallback·가격.
 - [S11] [GenerateContent Priority](https://ai.google.dev/gemini-api/docs/generate-content/priority-inference), `docs/google-gemini/priority-inference.md`, 전체 HTML 등록·보관. Tier 2/3·header·강등·rate·가격.
-- [S12] 설치 SDK 2.28.0 정본 `node_modules/@google/genai/dist/genai.d.ts`와 `dist/node/index.mjs`; 전체 보관 `docs/google-genai/sdk-2.28.0-types.md`, `docs/google-genai/sdk-2.28.0-node.md`. Batches, GenerateContentConfig, ServiceTier, InlinedRequest/Response, DownloadFileParameters, HttpResponse 및 Mldev 변환 확인.
+- [S12] 다운로드한 공식 SDK 2.28.0 배포물 정본 tarball 내부 `package/dist/genai.d.ts`와 `package/dist/node/index.mjs`; 전체 보관 `docs/google-genai/sdk-2.28.0-types.md`, `docs/google-genai/sdk-2.28.0-node.md`. Batches, GenerateContentConfig, ServiceTier, InlinedRequest/Response, DownloadFileParameters, HttpResponse 및 Mldev 변환 확인.
