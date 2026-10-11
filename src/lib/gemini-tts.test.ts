@@ -5,6 +5,49 @@ import { NextRequest } from "next/server";
 import { POST } from "../app/api/tts/route";
 import { parseTts, MODELS, type TtsRequest } from "./tts-contract";
 import { requestGroups, wireRequest } from "./gemini-tts";
+import { dialogueParts } from "./dialogue-blocks";
+
+it("rejects overlong speaker declarations instead of silently assigning the fallback voice",()=>{
+ const r=dialogue();r.turns=[{speaker:"A",text:"이".repeat(41)+": 대사",style:""}];
+ expect(()=>requestGroups(parseTts(r))).toThrow(/40자/);
+});
+it("preserves continuation CRLF, tags, Unicode and whitespace while removing only speaker separators",()=>{
+ const r=dialogue();r.speakers[0].name="  가 나  ";r.speakers[1].name="é";
+ const block={speaker:"B",text:"서문 👩‍👩‍👧‍👦\r\n  가 나：  <laugh>안녕\r\n계속\r\n\r\né:\r\n  끝  ",style:" \n연출  "};
+ expect(dialogueParts(parseTts(r),block,0).parts).toEqual([
+  {speaker:"B",text:"서문 👩‍👩‍👧‍👦\r\n",style:block.style},
+  {speaker:"A",text:" <laugh>안녕\r\n계속\r\n\r\n",style:block.style},
+  {speaker:"B",text:"\r\n  끝  ",style:block.style},
+ ]);
+});
+it("plain dialogue keeps fallback voice and URLs, timestamps and mid-sentence colons verbatim",()=>{
+ const r=dialogue();const block={speaker:"B",text:"https://example.test:8080\n12:30 오후\n대사, 설명: 그대로\n",style:" 연출 "};
+ expect(dialogueParts(r,block,0)).toEqual({parts:[block],named:false});
+});
+it.each(MODELS.flatMap(model=>["prebuilt-dialogue","custom-dialogue"].map(mode=>({model,mode:mode as TtsRequest["mode"]}))))("stable A/B aliases remain valid with display names: $model/$mode",({model,mode})=>{
+ const r=dialogue(mode);r.model=model;r.speakers[0].name="수아";r.speakers[1].name="민재";r.turns=[{speaker:"A",text:"B: 먼저\nA: 다음",style:" 원문 연출 "}];
+ const groups=requestGroups(parseTts(r));expect(groups).toHaveLength(mode==="prebuilt-dialogue"?1:2);
+ expect(groups.flat().map(t=>t.speaker)).toEqual(["B","A"]);
+ expect(groups.flat().map(t=>t.style)).toEqual([" 원문 연출 "," 원문 연출 "]);
+});
+it("custom named blocks send the matching single voice in utterance order",async()=>{
+ const r=dialogue("custom-dialogue");r.speakers[0].name="수아";r.speakers[1]={id:"B",name:"민재",voice:{kind:"stored-custom",value:"voice_b"}};
+ r.turns=[{speaker:"A",text:"수아: 하나\n민재: 둘",style:"앞"},{speaker:"B",text:"민재: 셋\n수아: 넷",style:"뒤"}];
+ const f=vi.fn().mockImplementation(()=>Promise.resolve(pcmResponse(f.mock.calls.length)));vi.stubGlobal("fetch",f);
+ const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
+ expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1,0,2,0,3,0,4,0]));
+ const wires=f.mock.calls.map(([,init])=>JSON.parse(init.body));
+ expect(wires.map(w=>w.generationConfig.speechConfig)).toEqual(["Puck","voice_b","voice_b","Puck"].map(voice=>({voiceConfig:{voice}})));
+ expect(wires.map(w=>w.contents[0].parts[0].speechMetadata)).toEqual(["앞","앞","뒤","뒤"].map(style=>({style})));
+});
+it.each(["모름: 대사","A: \nB: 대사","A: 대사\nB:  "])("preflights an invalid later block with zero provider calls: %s",async(text)=>{
+ const r=dialogue();r.turns[1].text=text;const f=vi.fn();vi.stubGlobal("fetch",f);
+ const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
+ expect(res.status).toBe(400);expect(f).not.toHaveBeenCalled();if(text.startsWith("모름"))expect(await res.text()).toContain("2번째 대사의 ‘모름’");
+});
+it.each([["동일"," 동일 "],["B","민재"],["수아","A"],["é","é"],["줄\n바꿈","민재"],["콜론:","민재"]])("rejects duplicate, reserved or malformed names %j / %j",(a,b)=>{
+ const r=dialogue();r.speakers[0].name=a;r.speakers[1].name=b;expect(()=>parseTts(r)).toThrow();
+});
 
 function dialogue(mode:TtsRequest["mode"]="prebuilt-dialogue"):TtsRequest {
  return {model:MODELS[0],mode,speakers:[{id:"A",voice:{kind:"prebuilt-name",value:"Puck"}},{id:"B",voice:{kind:"prebuilt-name",value:"Kore"}}],turns:[{speaker:"A",text:"가".repeat(700),style:"  다정하게\n"},{speaker:"B",text:"나".repeat(700),style:" 힘차게 "}],output:{encoding:"AUDIO_L16",sampleRate:24000},serviceTier:"standard"};
