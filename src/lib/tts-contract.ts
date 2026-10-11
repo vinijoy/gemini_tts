@@ -1,7 +1,7 @@
 export const MODELS = ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"] as const;
 // 앱의 운송·분할 예산이며 모델의 토큰 한도를 계산하는 값은 아니다.
-export const MAX_TTS_JOB_BYTES = 65_536;
-export const MAX_TTS_REQUEST_BYTES = 6_000;
+export const MAX_TTS_JOB_BYTES = 1_048_576;
+export const MAX_TTS_REQUEST_BYTES = 18_000;
 export const MAX_TTS_REQUEST_CODE_POINTS = 1_000;
 export const MAX_TTS_REQUESTS = 128;
 export function jsonBytes(value:unknown):number { return new TextEncoder().encode(JSON.stringify(value)).byteLength; }
@@ -20,9 +20,9 @@ export function parseTts(value:unknown):TtsRequest {
   if(!Array.isArray(b.speakers)||b.speakers.length<1||b.speakers.length>2||!Array.isArray(b.turns)||b.turns.length<1)throw new AppError(400,"화자 구성이나 대사 목록이 올바르지 않은 상태입니다.");
   const speakers=b.speakers.map(s=>{const row=object(s), v=object(row.voice);const id=string(row.id,40,"화자");if(!/^[\p{L}\p{N}_-]+$/u.test(id))throw new AppError(400,"화자 이름 형식이 올바르지 않습니다.");const kind=v.kind as VoiceRef["kind"];const val=string(v.value,4096,"목소리");if(!["prebuilt-name","prebuilt-id","stored-custom","ephemeral-replica"].includes(kind)|| (kind==="prebuilt-name"&&!VOICE_NAMES.includes(val))|| (kind!=="prebuilt-name"&&!/^[A-Za-z0-9_./+=-]+$/.test(val)))throw new AppError(400,"목소리 참조가 올바르지 않습니다.");return {id,voice:{kind,value:val}};});
   if(new Set(speakers.map(s=>s.id)).size!==speakers.length || (b.mode==="single"&&speakers.length!==1)|| (b.mode!=="single"&&speakers.length!==2)|| (b.mode==="prebuilt-dialogue"&&speakers.some(s=>!s.voice.kind.startsWith("prebuilt"))))throw new AppError(400,"화자 구성과 모드가 일치하지 않습니다.");
-  const turns=b.turns.map(t=>{const row=object(t);const speaker=string(row.speaker,40,"발화 화자");if(!speakers.some(s=>s.id===speaker))throw new AppError(400,"등록되지 않은 발화 화자입니다.");return {speaker,text:string(row.text,MAX_TTS_JOB_BYTES,"대본"),style:string(row.style??"",MAX_TTS_JOB_BYTES,"연출",true)};});
+  const turns=b.turns.map(t=>{const row=object(t);const speaker=string(row.speaker,40,"발화 화자");if(!speakers.some(s=>s.id===speaker))throw new AppError(400,"등록되지 않은 발화 화자입니다.");return {speaker,text:string(row.text,MAX_TTS_JOB_BYTES,"대본"),style:string(row.style??"",1000,"연출",true)};});
   const o=object(b.output);if(!ENCODINGS.includes(o.encoding as TtsRequest["output"]["encoding"])||![8000,16000,24000].includes(Number(o.sampleRate))||typeof o.sampleRate!=="number")throw new AppError(400,"출력 형식 또는 샘플레이트가 올바르지 않습니다.");
   const request={model:b.model as TtsRequest["model"],mode:b.mode as TtsRequest["mode"],speakers,turns,output:{encoding:o.encoding as TtsRequest["output"]["encoding"],sampleRate:o.sampleRate},serviceTier:b.serviceTier as TtsRequest["serviceTier"]};
-  if(jsonBytes(request)>MAX_TTS_JOB_BYTES)throw new AppError(413,"입력 작업이 64KiB 용량 제한을 넘은 상태입니다.");
+  if(jsonBytes(request)>MAX_TTS_JOB_BYTES)throw new AppError(413,"입력 작업이 1MiB 용량 제한을 넘은 상태입니다.");
   return request;
 }

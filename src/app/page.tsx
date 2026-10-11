@@ -524,6 +524,7 @@ export default function Home() {
           </div>
 
           {options.mode !== "single" && <TtsEditor section="turns" value={options} onChange={setOptions} disabled={isLoading}/>}
+          <p>작업 한도는 입력 1MiB, 생성 요청 128회, 음성 32MiB입니다. 현재 음성 설정에서는 약 {Math.floor(MAX_AUDIO_BYTES / (options.output.sampleRate * 2) / 60)}분 {Math.floor(MAX_AUDIO_BYTES / (options.output.sampleRate * 2) % 60)}초까지입니다.</p>
           </section>
 
           <section aria-labelledby="generation-output" className="space-y-4">

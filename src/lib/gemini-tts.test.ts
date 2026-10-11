@@ -23,10 +23,10 @@ it("POST accepts 1,400 dialogue characters and joins sequential PCM with verbati
 it.each(MODELS.flatMap(model=>["single","prebuilt-dialogue","custom-dialogue"].map(mode=>({model,mode:mode as TtsRequest["mode"]}))))("plans lossless Unicode chunks for $model / $mode",({model,mode})=>{
  const r=dialogue(mode);r.model=model;if(mode==="single")r.speakers=r.speakers.slice(0,1);
  const text="  한글👩‍👩‍👧‍👦é [laughing] <break time=\"1s\">\n".repeat(90)+"끝  ";
- r.turns=[{speaker:"A",text,style:"  연출\n".repeat(220)}];
+ r.turns=[{speaker:"A",text,style:"  연출\n".repeat(150)}];
  const groups=requestGroups(parseTts(r));expect(groups.length).toBeGreaterThan(1);
  expect(groups.flat().map(t=>t.text).join("")).toBe(text);
- for(const group of groups){expect(Buffer.byteLength(JSON.stringify(wireRequest(r,group)))).toBeLessThanOrEqual(6000);expect(Array.from(group.map(t=>t.text).join("")).length).toBeLessThanOrEqual(1000);for(const part of group){expect(part.style).toBe(r.turns[0].style);expect(part.speaker).toBe("A");expect(part.text.trim()).not.toBe("");expect(part.text).not.toMatch(/^[\uDC00-\uDFFF\u0301]|[\uD800-\uDBFF]$/u);expect((part.text.match(/\[laughing\]/g)??[]).length).toBe((part.text.match(/\[/g)??[]).length);}}
+ for(const group of groups){expect(Buffer.byteLength(JSON.stringify(wireRequest(r,group)))).toBeLessThanOrEqual(18000);expect(Array.from(group.map(t=>t.text).join("")).length).toBeLessThanOrEqual(1000);for(const part of group){expect(part.style).toBe(r.turns[0].style);expect(part.speaker).toBe("A");expect(part.text.trim()).not.toBe("");expect(part.text).not.toMatch(/^[\uDC00-\uDFFF\u0301]|[\uD800-\uDBFF]$/u);expect((part.text.match(/\[laughing\]/g)??[]).length).toBe((part.text.match(/\[/g)??[]).length);}}
 });
 it("accepts 21 turns and more than 4,000 total style characters",()=>{
  const r=dialogue();r.turns=Array.from({length:21},(_,i)=>({speaker:i%2?"B":"A",text:"대사",style:"s".repeat(220)}));
@@ -40,10 +40,10 @@ it("manual turns stay separate with their own directions even when short",()=>{
 });
 it("preflights oversized directions, voice configuration and 129 custom calls",async()=>{
  const r=dialogue();const calls=vi.fn();vi.stubGlobal("fetch",calls);
- for(const invalid of [{...r,turns:[...r.turns,{speaker:"B",text:"끝",style:"가".repeat(2100)}]}, {...r,speakers:r.speakers.map(s=>({...s,voice:{kind:"prebuilt-id",value:"a".repeat(4096)}}))}, {...dialogue("custom-dialogue"),turns:Array.from({length:129},()=>({speaker:"A",text:"a",style:""}))}]){
+ for(const invalid of [{...r,turns:[...r.turns,{speaker:"B",text:"끝",style:"가".repeat(6100)}]}, {...dialogue("custom-dialogue"),turns:Array.from({length:129},()=>({speaker:"A",text:"a",style:""}))}]){
  const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(invalid)}));expect(res.status).toBe(400);}
  expect(calls).not.toHaveBeenCalled();
- const single=dialogue("single");single.speakers=[{id:"A",voice:{kind:"prebuilt-id",value:"a".repeat(4096)}}];single.turns=[{speaker:"A",text:"가".repeat(2000),style:"s".repeat(1001)}];
+ const single=dialogue("single");single.speakers=[{id:"A",voice:{kind:"prebuilt-id",value:"a".repeat(4096)}}];single.turns=[{speaker:"A",text:"가".repeat(2000),style:"s".repeat(1000)}];
  expect(requestGroups(parseTts(single)).flat().map(t=>t.text).join("")).toBe(single.turns[0].text);
 });
 

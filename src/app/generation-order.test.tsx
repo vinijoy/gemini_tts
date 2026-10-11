@@ -66,7 +66,7 @@ it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 두 화자 대�
   render(<Home />);
   expect(screen.queryByRole("button", {name: "대사 추가"})).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("화자 모드"), mode);
-  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("각 대사의 연출은 나눈 구간마다 동일하게 적용됩니다.");
+  expect(screen.getByText(/^두 화자의 대화입니다[.]/)).toHaveTextContent("각 대사는 지정한 연출로 따로 생성합니다.");
   expect(screen.queryByText(/첫 발화는 위 대본과 연출|위의 대본과 말투는 첫 번째 화자/)).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", {name: "대사 추가"}));
   expect(screen.getByLabelText("발화 2 화자")).toHaveValue("B");

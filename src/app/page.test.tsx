@@ -288,39 +288,42 @@ afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
 });
-it("긴 본문과 태그를 자르지 않고 보존한다", async () => {
+it("본문 입력과 태그 추가를 1,000자에서 원천 차단한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
     const textInput = screen.getByLabelText("음성으로 변환할 텍스트 입력창");
-    expect(textInput).not.toHaveAttribute("maxLength");
+    expect(textInput).toHaveAttribute("maxLength", "1000");
     fireEvent.change(textInput, { target: { value: "가".repeat(1001) } });
-    expect(textInput).toHaveValue("가".repeat(1001));
+    expect(textInput).toHaveValue("가".repeat(1000));
     await user.click(screen.getByRole("button", { name: "웃음 태그 추가" }));
-    expect(textInput).toHaveValue("가".repeat(1001)+"<laugh> ");
+    expect(textInput).toHaveValue("가".repeat(1000));
 });
-it.each(["single","prebuilt-dialogue"])("%s 장문 조각을 먼저 표시하고 각각 수정한 연출로 생성한다",async(mode)=>{
- const user=userEvent.setup();render(<Home />);
- await user.selectOptions(screen.getByLabelText("화자 모드"),mode);
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"가".repeat(1400)}});
- fireEvent.change(screen.getByLabelText("스타일 및 감정 입력창"),{target:{value:" 첫 연출 "}});
- await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
- expect(fetch).not.toHaveBeenCalled();expect(player.activate).not.toHaveBeenCalled();
- expect(screen.getByLabelText("발화 2 대본")).toHaveValue("가".repeat(400));
- expect(screen.getByLabelText("발화 2 연출")).toHaveValue(" 첫 연출 ");
- expect(screen.getByRole("status")).toHaveTextContent("2개");
- fireEvent.change(screen.getByLabelText("발화 2 연출"),{target:{value:" 뒤 조각만 차분하게\n"}});
+it.each(["prebuilt-dialogue","custom-dialogue"])("%s 추가 대사는 각자 지정한 연출로 별도 생성하고 완성 WAV로 연결한다",async(mode)=>{
+ streamSettled=true;
  const provider=vi.fn().mockImplementation(()=>Promise.resolve(new Response(`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:"audio/l16;rate=24000",data:Buffer.from([provider.mock.calls.length,0]).toString("base64")}}]},finishReason:"STOP"}]})}\n\n`)));
  vi.stubGlobal("fetch",vi.fn((url,init)=>String(url)==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):provider(url,init)));
+ const user=userEvent.setup();render(<Home />);await user.selectOptions(screen.getByLabelText("화자 모드"),mode);
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"가".repeat(1000)}});
+ fireEvent.change(screen.getByLabelText("스타일 및 감정 입력창"),{target:{value:" 앞 연출 "+"한".repeat(990)}});
+ await user.click(screen.getByRole("button",{name:"대사 추가"}));
+ fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"나".repeat(1000)}});
+ fireEvent.change(screen.getByLabelText("발화 2 연출"),{target:{value:" 뒤 연출 "+"글".repeat(990)}});
+ expect(screen.getByLabelText("발화 2 대본")).toHaveAttribute("maxLength","1000");
+ expect(screen.getByLabelText("발화 2 연출")).toHaveAttribute("maxLength","1000");
  await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
  expect(await screen.findByRole("link",{name:"생성된 음성 파일 다운로드"})).toBeVisible();
  expect(provider).toHaveBeenCalledTimes(2);
- expect(provider.mock.calls.map(([,init])=>JSON.parse(init.body).contents[0].parts[0].speechMetadata.style)).toEqual([" 첫 연출 "," 뒤 조각만 차분하게\n"]);
+ expect(provider.mock.calls.map(([,init])=>JSON.parse(init.body).contents[0].parts[0])).toEqual([
+  {text:"가".repeat(1000),speechMetadata:{style:" 앞 연출 "+"한".repeat(990),...(mode==="prebuilt-dialogue"?{speaker:"A"}:{})}},
+  {text:"나".repeat(1000),speechMetadata:{style:" 뒤 연출 "+"글".repeat(990),...(mode==="prebuilt-dialogue"?{speaker:"B"}:{})}},
+ ]);
  expect(player.enqueue.mock.calls.flatMap(([samples])=>Array.from(samples))).toEqual([1,2]);
+ expect(createObjectUrl.mock.calls.at(-1)?.[0].type).toBe("audio/wav");
 });
-it("작업 용량 초과 시 입력을 보존하고 생성하지 않는다",async()=>{
- const user=userEvent.setup();render(<Home/>);const input=screen.getByLabelText("음성으로 변환할 텍스트 입력창");const text="가".repeat(22000);
- fireEvent.change(input,{target:{value:text}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
- expect(screen.getByRole("alert")).toHaveTextContent("64KiB");expect(input).toHaveValue(text);expect(fetch).not.toHaveBeenCalled();
+it("대사를 21개 이상 추가할 수 있고 입력별 제한은 유지한다",async()=>{
+ const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
+ for(let i=0;i<20;i++)await user.click(screen.getByRole("button",{name:"대사 추가"}));
+ expect(screen.getByLabelText("발화 21 대본")).toHaveAttribute("maxLength","1000");expect(screen.getByRole("button",{name:"대사 추가"})).toBeEnabled();
 });
 it("생성 중 첫 PCM 청크를 자동 재생하고 결과 액션을 비활성화한다", async () => {
     const user = userEvent.setup();
