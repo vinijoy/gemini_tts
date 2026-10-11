@@ -325,6 +325,24 @@ it("대사를 21개 이상 추가할 수 있고 입력별 제한은 유지한다
  for(let i=0;i<20;i++)await user.click(screen.getByRole("button",{name:"대사 추가"}));
  expect(screen.getByLabelText("발화 21 대본")).toHaveAttribute("maxLength","1000");expect(screen.getByRole("button",{name:"대사 추가"})).toBeEnabled();
 });
+it("뒤 대사의 실패는 재생기를 닫고 완성 파일을 만들지 않는다",async()=>{
+ streamSettled=true;vi.spyOn(console,"error").mockImplementation(()=>{});
+ let count=0;vi.stubGlobal("fetch",vi.fn(async(url,init)=>{
+  if(url==="/api/tts")return POST(new Request("http://localhost/api/tts",init));
+  count++;return count===1?new Response('data: {"candidates":[{"content":{"parts":[{"inlineData":{"data":"AQACAA==","mimeType":"audio/l16;rate=24000"}}]},"finishReason":"STOP"}]}\n\n'):new Response("later failure",{status:502});
+ }));
+ const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"첫 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"뒤 대사"}});
+ await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));await screen.findByRole("alert");
+ expect(player.close).toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();expect(screen.queryByRole("link",{name:"생성된 음성 파일 다운로드"})).not.toBeInTheDocument();expect(count).toBe(2);
+});
+it("브라우저도 32MiB 초과 오디오를 중단하고 완성 파일을 만들지 않는다",async()=>{
+ vi.spyOn(console,"error").mockImplementation(()=>{});const user=userEvent.setup();render(<Home/>);
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"용량 검사"}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
+ await act(async()=>{streamController.enqueue(new Uint8Array(32*1024*1024+2));});
+ expect(await screen.findByRole("alert")).toHaveTextContent("32MiB");expect(player.close).toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();
+ streamSettled=true;
+});
 it("생성 중 첫 PCM 청크를 자동 재생하고 결과 액션을 비활성화한다", async () => {
     const user = userEvent.setup();
     render(<Home />);

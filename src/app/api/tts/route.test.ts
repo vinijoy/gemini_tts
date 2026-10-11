@@ -47,7 +47,8 @@ it.each([8000,16000,24000].flatMap(sampleRate=>["AUDIO_L16","AUDIO_WAV","AUDIO_M
  const r=await POST(req({...threeTurns(),output}));expect((await r.arrayBuffer()).byteLength).toBe(12);expect(f).toHaveBeenCalledTimes(3);
 });
 it("accepts the 32MiB cumulative PCM boundary then rejects further audio",async()=>{
- const block=event("STOP",Buffer.alloc(MAX_AUDIO_BYTES/2).toString("base64"));
+ const data=Buffer.alloc(64*1024).toString("base64");
+ const block=event(undefined,data).repeat(MAX_AUDIO_BYTES/(2*64*1024)-1)+event("STOP",data);
  const f=vi.fn().mockImplementation(()=>Promise.resolve(new Response(block)));vi.stubGlobal("fetch",f);
  const r=await POST(req({...threeTurns(),turns:threeTurns().turns.slice(0,2)}));expect((await r.arrayBuffer()).byteLength).toBe(MAX_AUDIO_BYTES);
  f.mockReset().mockImplementation(()=>Promise.resolve(new Response(block)));
