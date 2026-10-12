@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 Phase: 1 of 3 (3.8 기본 합성과 공식 목소리 선택)
 Plan: 0 of TBD in current phase
 Status: Quick implementation complete — product acceptance pending
-Last activity: 2026-10-12 — 이름 첫 등장 순서 자동 연결 수정·203개 검사 통과; 긴 저음량 오디오 구간은 실제 요청 진단 대기
+Last activity: 2026-10-12 — 자동 화자 매핑·203개 검사 통과, 사용자 재생성 정상 확인; 과거 긴 잡음 원인은 미확정
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -105,5 +105,5 @@ Decisions are logged in PROJECT.md Key Decisions table.
 ## Session Continuity
 
 Last session: 2026-10-12
-Stopped at: 이름 등록 제거·전체 대본 자동 매핑 완료. 오디오 잡음 원인 미확정; 진단 서버에서 사용자 재현 대기. 기존 단계 진행률 유지.
+Stopped at: 이름 등록 제거 완료·사용자 재생성 정상 확인. 임시 진단 종료, 일반 개발 서버 실행. 과거 오디오 원인 및 새 안내 VoiceOver는 미확정. 단계 진행률 유지.
 Resume file: .planning/debug/dialogue-audio-gap.md

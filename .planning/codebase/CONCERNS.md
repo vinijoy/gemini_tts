@@ -43,7 +43,7 @@ mapped_paths:
 **대사 사이 긴 저에너지 오디오 (부분 갱신 2026-10-12, `fb005bd`):**
 - Symptoms: 실제 다운로드 WAV는 481.56초이며 88–234초·235–415초에 저에너지 신호가 있다. 완전한 무음 또는 제거 가능한 불필요 소리로 확정하지 않는다.
 - Files: `.planning/debug/dialogue-audio-gap.md`, `src/lib/tts-audio-diagnostics.ts`, `src/lib/gemini-tts.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`
-- Trigger: 두 번째 대사 전 긴 노이즈/공백이 사용자에게 보고되었다. 원래 provider 응답·요청 경계가 없어 원인은 미확정이다.
+- Trigger: 두 번째 대사 전 긴 노이즈/공백이 사용자에게 보고되었다. 원래 provider 응답·요청 경계가 없어 원인은 미확정이다. 2026-10-12 후속 실제 생성은 사용자 정상 확인을 받았고, 71.08초+79초의 두 요청에 10초 이상 저에너지 구간이 없었다. 과거 파일의 원인까지 확정한 것은 아니다.
 - Workaround: 확인된 음성 수정은 없다. 진단 off/on fixture 재생은 검사한 경로의 바이트 동일성만 입증하며 provider 책임은 입증하지 않는다. 기본 off인 `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`은 요청별 메타데이터 JSON만 기록하고 본문·목소리·키·PCM을 기록하거나 오디오를 제거하지 않는다. localhost:3000에서 사용자 재현·청취가 대기다.
 - Scope: 기존 매핑 범위와 `24afbbf`는 이전 체크포인트로 보존한다.
 

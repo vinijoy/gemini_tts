@@ -72,7 +72,7 @@ Next.js 특수 파일은 `page.tsx`, `layout.tsx`, `route.ts`다. 일반 파일�
 
 ## 새 코드 추가 위치
 
-- 대화 입력 회귀(261012-boh): 입력 블록과 발화를 동일시하지 않는다. 여러 블록 각각에 여러 등록 이름·다른 연출·반대 화자부터 시작하는 fixture를 넣어 실제 POST의 wire metadata와 PCM 순서를 검사한다. 예시 이름을 고정하거나 별도 등록을 요구하지 않는다. 사용자 결정에 따라 전체 요청에서 처음 나온 이름을 A, 다음 이름을 B로 한 번만 연결하고 모든 블록에 재사용한다. A/B 직접 표기는 고정 목소리를 유지하며 세 번째 다른 이름은 사전 거부한다. `src/lib/dialogue-blocks.ts`가 이름→stable id를 해석하며 기본 대화는 매 블록에 두 voice configs와 발화별 speaker parts, 맞춤 대화는 발화별 single voice를 보낸다. 회귀: `npm test -- src/lib/gemini-tts.test.ts src/app/page.test.tsx src/app/generation-order.test.tsx`. 등록 입력 제거 후 안내의 VoiceOver·두 블록 청취는 대기다.
+- 대화 입력 회귀(261012-boh): 입력 블록과 발화를 동일시하지 않는다. 여러 블록 각각에 서로 다른 이름·다른 연출·반대 화자부터 시작하는 fixture를 넣어 실제 POST의 wire metadata와 PCM 순서를 검사한다. 예시 이름을 고정하거나 별도 등록을 요구하지 않는다. 사용자 결정에 따라 전체 요청에서 처음 나온 이름을 A, 다음 이름을 B로 한 번만 연결하고 모든 블록에 재사용한다. A/B 직접 표기는 고정 목소리를 유지하며 세 번째 다른 이름은 사전 거부한다. `src/lib/dialogue-blocks.ts`가 이름→stable id를 해석하며 기본 대화는 매 블록에 두 voice configs와 발화별 speaker parts, 맞춤 대화는 발화별 single voice를 보낸다. 회귀: `npm test -- src/lib/gemini-tts.test.ts src/app/page.test.tsx src/app/generation-order.test.tsx`. 2026-10-12 사용자는 등록 제거 후 재생성이 정상이라고 확인했다(긴 잡음 미재현). 새 안내의 VoiceOver 확인은 별도로 대기다.
 
 - 생성 탭 UI 순서: 모델·화자 → 목소리 → 대본·말투·태그·추가 발화 → 출력 → 생성·결과를 DOM과 화면에 동일하게 유지한다. h2 제목으로 구역을 탐색하며 CSS order나 양수 tabindex로 순서를 따로 만들지 않는다. 화자 B 기본 목소리는 기본 목소리 영역에, 추가 발화는 첫 대본 뒤에 둔다. 확장 방식에서는 중복 기본 선택 메뉴를 노출하지 않는다. `src/app/generation-order.test.tsx`의 DOM/Tab 순서·입력 보존과 `src/app/page.test.tsx`의 숨은 메뉴 회귀를 실행한다. 2026-10-11 사용자 VoiceOver 확인은 이 배치에 한하며 새 변경의 실기 확인을 대체하지 않는다.
 
@@ -84,6 +84,8 @@ Next.js 특수 파일은 `page.tsx`, `layout.tsx`, `route.ts`다. 일반 파일�
 - 탭 안 선택 메뉴 추가: `src/app/components/TabPanel.tsx`의 `TabSelect`를 사용하고 부모에 제어형 `value`/`onChange` 상태를 둔다. 네이티브 메뉴 노출 방지를 `hidden`+`inert`만으로 처리하지 않는다. 비동기 초점 복원은 `src/app/components/VoiceLibrary.tsx`와 `src/app/components/VoiceStudio.tsx`처럼 `[hidden], [inert]` 조상을 검사한다.
 - 공통 한국어 표시: `src/lib/tts-labels.ts`를 사용한다. 언어/지역 UI는 `src/app/components/LocaleSelect.tsx`, 선택값 데이터는 `src/lib/voice-locale-options.json`에 둔다.
 - 새 API: `src/app/api/<name>/route.ts`, 테스트는 같은 디렉터리.
+- 긴 잡음·공백 재발 조사: 먼저 문제 WAV와 실제 요청별 MIME·샘플 경계·길이를 대조한다. 이미 생성된 WAV의 바이트 보존 replay만으로 최초 공급자 응답이나 모든 앱 원인을 확정하지 않는다. 필요할 때만 `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`을 켜고 `src/lib/tts-audio-diagnostics.test.ts`의 기본 off·민감 내용 미기록·PCM 보존 검사를 유지한다. 재현 확인 후 진단을 끄며, 에너지 수치만으로 조용한 발화를 잘라내지 않는다. 실제 확인 범위는 `.planning/ui-followup.md`와 `.planning/debug/dialogue-audio-gap.md`에 남긴다.
+
 - 새 오디오 모듈: `src/utils/`, PCM 계약(8/16/24kHz mono 16-bit)을 유지하고 co-located 테스트를 추가한다.
 - 새 Gemini 기능: `src/lib/`에 REST 처리와 같은 위치의 `*.test.ts`를 두고, Route Handler는 입력/응답 경계로 유지한다. 공유 입력은 `src/lib/tts-contract.ts`를 재사용한다.
 

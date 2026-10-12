@@ -22,7 +22,7 @@ candidate_causes:
 and_gate: unknown; a provider tail plus sequential request handling could combine, but raw provider boundaries are unavailable.
 test: Completed original-artifact replay and verified opt-in per-request diagnostics with synthetic tests and the supplied artifact.
 expecting: Request-index and cumulative sample offsets will distinguish response-internal quiet output from inter-response boundaries on a future reproduction.
-next_action: Coordinator starts the local server with GEMINI_TTS_AUDIO_DIAGNOSTICS=1; user repeats the original generation; inspect emitted JSON for original request boundaries and low-energy spans. Actual paid generation remains user-operated.
+next_action: User-confirmed new generation is normal; diagnostics disabled. If symptom recurs, collect its actual request boundaries again. Prior artifact cause remains open.
 reasoning_checkpoint:
   hypothesis: Missing per-response format and sample-boundary evidence prevents locating the historical gap within a provider response or between responses.
   confirming_evidence:
@@ -103,3 +103,10 @@ files_changed: [src/lib/tts-audio-diagnostics.ts, src/lib/tts-audio-diagnostics.
 - Source checkpoint `fb005bd`: automatic first-appearance name mapping plus opt-in diagnostics. Full suite: 203 tests / 19 files; lint and production build passed. Audio defect remains unresolved.
 - Parent started `GEMINI_TTS_AUDIO_DIAGNOSTICS=1 npm run dev` (tool session 17500); `http://localhost:3000/` returned HTTP 200. Verify the server is still running on resume.
 - Awaiting user reproduction; no real provider generation was triggered by the agent. Inspect session output or only `tts_audio_diagnostics` entries in `.next/dev/logs/next-development.log`. No diagnostic entries observed at this checkpoint.
+
+## User-confirmed reproduction outcome (2026-10-12)
+
+- User: “다시 생성했고 이번에는 정상”. Run `b181cfe6-c174-46b7-91d2-463167d856e5`, PCM16 mono 24kHz.
+- Request 0: 3,411,840 source/decoded bytes, output samples 0–1,705,920, 71.08s, longest low energy 1s. Request 1: 3,792,000 source/decoded bytes, samples 1,705,920–3,601,920, 79s, longest low energy 2s. Both completed, no 10s low-energy regions, no partial sample bytes. Total150.08s.
+- The historical symptom did not recur in this run; this does not establish the cause of the previous file. No audio-content trimming or normalization was applied. Actual screen-reader acceptance is still untested.
+- Diagnostic session17500 terminated intentionally (exit143); normal `npm run dev` started as session75277 without diagnostic flag. Verify runtime on resume; do not assume a saved session remains alive.
