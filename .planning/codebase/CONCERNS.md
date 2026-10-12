@@ -40,6 +40,13 @@ mapped_paths:
 
 ## Known Bugs
 
+**대사 사이 긴 저에너지 오디오 (부분 갱신 2026-10-12, `fb005bd`):**
+- Symptoms: 실제 다운로드 WAV는 481.56초이며 88–234초·235–415초에 저에너지 신호가 있다. 완전한 무음 또는 제거 가능한 불필요 소리로 확정하지 않는다.
+- Files: `.planning/debug/dialogue-audio-gap.md`, `src/lib/tts-audio-diagnostics.ts`, `src/lib/gemini-tts.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`
+- Trigger: 두 번째 대사 전 긴 노이즈/공백이 사용자에게 보고되었다. 원래 provider 응답·요청 경계가 없어 원인은 미확정이다.
+- Workaround: 확인된 음성 수정은 없다. 진단 off/on fixture 재생은 검사한 경로의 바이트 동일성만 입증하며 provider 책임은 입증하지 않는다. 기본 off인 `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`은 요청별 메타데이터 JSON만 기록하고 본문·목소리·키·PCM을 기록하거나 오디오를 제거하지 않는다. localhost:3000에서 사용자 재현·청취가 대기다.
+- Scope: 기존 매핑 범위와 `24afbbf`는 이전 체크포인트로 보존한다.
+
 공백 원고·임의 기본 음성은 `src/lib/tts-contract.ts`의 trim·허용 목록 검증으로 차단한다. `src/app/api/tts/route.test.ts`에 malformed contract 거부 테스트가 있다. 미확인 실서비스 동작을 확인된 버그로 분류하지 않는다.
 
 ## Security Considerations
@@ -63,8 +70,8 @@ mapped_paths:
 **입력 블록과 발화의 구분 (부분 갱신 2026-10-12, `24afbbf`):**
 - Files: `src/lib/dialogue-blocks.ts`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.ts`, `src/app/components/TtsEditor.tsx`
 - Why fragile: 한 칸에 여러 이름이 올 수 있어 블록 전체에 선택 화자 하나를 강제하면 다른 목소리를 잃는다. 이름 해석과 일반 본문 구분은 별도 회귀가 필요하다.
-- Safe modification: 사용자 이름과 A/B 별칭을 유지한다. prebuilt는 블록의 여러 parts와 두 voice configs, custom은 발화별 single voice, 공통으로 블록 연출을 유지한다. 이름 있는 계획 단위의 예산 초과는 사전 거부한다.
-- Test coverage: `src/lib/gemini-tts.test.ts`, `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`에서 두 다화자 블록·역순 시작·다른 연출·이름 검증을 함께 확인한다. `named_blocks_mapped_paths`만 갱신했으며 기존 전체 매핑 범위는 유지한다. 실제 모델 음성·새 필드 VoiceOver/NVDA는 대기다.
+- Safe modification: 등록 UI 없이 전체 블록 최초 이름=A·다음 이름=B의 매핑을 한 번 생성해 재사용한다. 직접 A/B는 고정 별칭이며 세 번째 화자는 사전 거부한다. `parseTts`는 legacy name을 무시한다. prebuilt의 여러 parts·두 voice configs와 custom 발화별 single voice, 블록별 연출을 보존한다. 이름 있는 계획 예산 초과는 사전 거부한다.
+- Test coverage: `src/lib/gemini-tts.test.ts`, `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`에서 두 다화자 블록·역순 시작·다른 연출·등록 필드 부재·전체 블록 매핑을 확인한다. 기존 매핑 범위는 유지한다. 실제 음성·VoiceOver/NVDA는 `.planning/debug/automatic-speaker-order.md`의 대기 범위를 따른다.
 
 **PCM 스트림과 브라우저 재생 수명 주기:**
 - Files: `src/lib/gemini-tts.ts`, `src/utils/audio-format.ts`, `src/app/page.tsx`, `src/utils/streaming-player.ts`
@@ -84,7 +91,7 @@ mapped_paths:
 - Files: `src/lib/gemini-tts.ts`, `src/lib/tts-contract.ts`, `src/lib/gemini-tts.test.ts`
 - Risk: 독립 요청 사이 억양·목소리·언어·연출 일관성은 mock PCM 결합으로 확인할 수 없다. 18,000-byte 앱 예산은 공식 토큰 계산이나 provider 수용 보증이 아니다.
 - Current mitigation: 블록의 이름별 발화·연출을 유지하고 전체 계획을 사전 검증한다. 이름 없는 직접 API 장문은 grapheme·완전한 태그·공백을 보존한다.
-- Follow-up: 실제 모델 청취·새 이름 필드와 오류 안내 VoiceOver/NVDA는 `.planning/quick/261012-boh-named-speaker-blocks/261012-boh-SUMMARY.md`, `.planning/ui-followup.md`의 대기 범위를 따른다.
+- Follow-up: 실제 모델 청취·등록 없는 입력 흐름과 오류 안내 VoiceOver/NVDA는 `.planning/debug/automatic-speaker-order.md`, `.planning/debug/dialogue-audio-gap.md`, `.planning/ui-followup.md`의 대기 범위를 따른다.
 
 ## Dependencies at Risk
 

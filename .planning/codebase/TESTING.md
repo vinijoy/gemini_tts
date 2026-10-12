@@ -98,9 +98,11 @@ async function* responses() {
 - `src/lib/gemini-tts.test.ts`: 합산 본문 1,000자·연출 4,000자 초과와 21턴 허용, 짧은 수동 대사도 분리, 두 모델×세 모드의 직접 API 장문 무손실 분할·연출 보존·요청별 예산을 검사한다.
 - `src/app/api/tts/route.test.ts`: 1MiB/128개 계획의 사전 거부, 최대 voice ref와 한글 본문·연출 1,000자씩 128행 허용, 4형식×3rate, 32MiB 누적 경계/초과, 뒤 요청 실패·대기 reader 취소·그룹별 PCM 경계를 검사한다.
 - `src/app/page.test.tsx`, `src/app/generation-order.test.tsx`: Home→실제 POST→mock provider의 독립 대사·연출과 완성 WAV, 21행·입력칸별 maxlength, DOM 순서·탭 보존, 뒤 실패·용량 초과 시 완성 파일 부재를 검사한다. 자동 조각 편집 UI 계약은 없다.
-- `src/lib/gemini-tts.test.ts`: 두 블록 모두 다화자이며 둘째는 B→A로 시작하는 fixture로 prebuilt의 두 voice configs·여러 speaker parts·블록별 다른 연출과 custom 발화별 single voice 순서를 확인한다. 이름·A/B 별칭, trim/NFC·CRLF·태그·공백, 이름 없는 선택 화자 fallback, 중복·충돌·미등록 이름·빈 발화 검증을 포함한다. 블록을 단일 발화로 가정하지 않는다.
-- `src/app/page.test.tsx`: Home→실제 POST→mock provider에서 두 블록의 A/B·B/A 순서·연출·PCM/WAV, 뒤 블록 미등록 이름의 upstream 0회와 입력 보존을 검사한다. `src/app/generation-order.test.tsx`는 이름 필드 순서와 모델·모드·탭 왕복 보존을 검사한다.
-- **부분 갱신 체크포인트 (2026-10-12, `24afbbf`):** `.planning/quick/261012-boh-named-speaker-blocks/261012-boh-SUMMARY.md`에 18파일 198 tests·lint·TypeScript·production build 통과가 기록되어 있다. `named_blocks_mapped_paths`만 부분 반영했으며 이 지도 갱신에서는 재실행하지 않았다. 후속 변경의 최종 검증으로 확대하지 않는다. 실제 유료 음성·양 모델 청취·새 이름 필드와 오류 안내 VoiceOver/NVDA는 대기다.
+- `src/lib/gemini-tts.test.ts`: 등록 없이 전체 블록 첫 이름=A·다음 이름=B로 연결하고 뒤 블록 역순 시작에도 매핑을 유지한다. prebuilt 두 voice configs·여러 parts, custom 발화별 single voice, 블록별 연출, trim/NFC·CRLF·태그·공백, fallback, A/B 혼용·URL/시각·세 번째 화자 사전 거부·legacy name 무시를 검사한다.
+- `src/app/page.test.tsx`: Home→실제 POST→mock provider에서 등록 필드 부재, 두 블록 A/B·B/A 순서·연출·PCM/WAV, 세 번째 이름의 upstream 0회와 입력 보존을 검사한다. `src/app/generation-order.test.tsx`는 화면 순서와 모델·모드·탭 왕복 보존을 검사한다.
+- **이전 체크포인트 (2026-10-12, `24afbbf`):** `.planning/quick/261012-boh-named-speaker-blocks/261012-boh-SUMMARY.md`의 18파일 198 tests·lint·TypeScript·production build 기록과 기존 매핑 범위를 보존한다.
+- **후속 부분 갱신 (2026-10-12, `fb005bd`):** coordinator 통합 검사에서 19파일 203 tests·lint·production build 통과가 보고되었다. 이 지도 갱신에서는 재실행하지 않았다. 관련 근거는 `.planning/debug/automatic-speaker-order.md`, `.planning/debug/dialogue-audio-gap.md`다. 실제 유료 생성·청취·VoiceOver/NVDA 수용은 대기다.
+- `src/lib/tts-audio-diagnostics.test.ts`, `src/lib/gemini-tts.test.ts`: 기본 off, opt-in 요청 경계·저에너지 통계, 민감 내용 미기록과 오디오 보존을 검사한다. `.planning/debug/dialogue-audio-gap.md`의 실제 WAV fixture 재생은 진단 off/on에서 검사한 경로가 바이트 동일함을 확인한다. 원래 provider 응답·요청 경계·실제 브라우저/네트워크 재현이나 provider 결함의 증거는 아니다.
 
 ## 커버리지
 

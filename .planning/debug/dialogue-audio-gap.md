@@ -97,3 +97,9 @@ files_changed: [src/lib/tts-audio-diagnostics.ts, src/lib/tts-audio-diagnostics.
 - `lowEnergyRegions[].startSample/endSample` are relative to that request; add `outputStartSample` for combined-file positions. RMS threshold -45dBFS, 1-second windows, minimum 10-second region; `peak` is the maximum absolute PCM16 sample in that region. `longestLowEnergySamples` includes short runs; regions array retains only the first eight long runs and reports the omitted count.
 - `sourceBytes`, `decodedBytes`, `audioParts`, `mimeTypes`, and `declaredRates` identify format/duration mismatches. `incompleteSampleBytes` distinguishes an incomplete final sample. `outcome` is a fixed completed/aborted/incomplete label; no raw error message is logged.
 - These are diagnostic energy measurements, not speech/silence recognition. Do not trim or fail a generation based only on them. After reproduction, restart without the flag to disable collection. Record whether the real low-energy span occurs within one response, at its trailing edge, or in a later response before proposing any audio-content change.
+
+## Live reproduction checkpoint (2026-10-12)
+
+- Source checkpoint `fb005bd`: automatic first-appearance name mapping plus opt-in diagnostics. Full suite: 203 tests / 19 files; lint and production build passed. Audio defect remains unresolved.
+- Parent started `GEMINI_TTS_AUDIO_DIAGNOSTICS=1 npm run dev` (tool session 17500); `http://localhost:3000/` returned HTTP 200. Verify the server is still running on resume.
+- Awaiting user reproduction; no real provider generation was triggered by the agent. Inspect session output or only `tts_audio_diagnostics` entries in `.next/dev/logs/next-development.log`. No diagnostic entries observed at this checkpoint.

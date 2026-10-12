@@ -122,10 +122,11 @@ Gemini 3.8 REST v1beta → SSE / Voices
 ## 주요 추상화
 
 - `TtsRequest`/`parseTts` (`src/lib/tts-contract.ts`): 구조화한 모델·화자·발화·출력 계약과 기존 text/voice 입력 호환.
-- `speakerAliases`/`dialogueParts` (`src/lib/tts-contract.ts`, `src/lib/dialogue-blocks.ts`): 선택적 `speaker.name`을 trim/NFC 비교해 화자 ID로 연결한다. UI A/B 별칭을 함께 유지하며 이름은 하드코딩하지 않는다. 선언 전 본문은 블록의 선택 화자, 선언 뒤 이어지는 줄은 직전 화자를 따른다. 이름 선언과 바로 뒤 구분 공백 한 칸만 제거하고 본문·CRLF·태그·연출은 보존한다.
-- 화자 이름 입력 (`src/app/components/TtsEditor.tsx`, `src/app/page.tsx`): 두 화자 모드의 선택적 대본 이름을 제공한다. 입력 블록 하나를 단일 발화로 가정하지 않는다.
+- `dialogueAliases`/`dialogueParts` (`src/lib/dialogue-blocks.ts`): 이름 등록 없이 전체 입력 블록의 첫 이름=A·다음 이름=B로 연결하고 `requestGroups`가 같은 매핑을 재사용한다 (`src/lib/gemini-tts.ts`). 뒤 블록의 역순 시작에도 목소리를 유지한다. 직접 A/B는 고정 별칭으로 슬롯을 점유하며 다른 이름은 남은 슬롯에 연결한다. trim/NFC 비교, 선언 전 선택 화자 fallback, CRLF·태그·블록 연출 보존을 유지한다. 세 번째 화자는 사전 거부하며 URL·시각은 이름으로 추측하지 않는다. `parseTts`의 화자 계약에는 name이 없고 legacy name은 무시한다 (`src/lib/tts-contract.ts`).
+- 이름 등록 UI·상태는 없다 (`src/app/components/TtsEditor.tsx`, `src/app/page.tsx`). 입력 블록 하나를 단일 발화로 가정하지 않는다.
 
 **부분 갱신 (2026-10-12, `24afbbf`):** `named_blocks_mapped_paths`의 이름별 블록 계약만 반영했다. 기존 매핑 범위와 전체 분석 기준은 유지한다.
+**후속 부분 갱신 (2026-10-12, `fb005bd`):** 자동 이름 연결·등록 제거와 요청별 진단만 반영했다. 기존 매핑 범위와 `24afbbf`는 이전 체크포인트로 보존한다. 근거는 `.planning/debug/automatic-speaker-order.md`, `.planning/debug/dialogue-audio-gap.md`다.
 - `wireRequest`/`requestGroups`/`openPcm` (`src/lib/gemini-tts.ts`): REST 직렬화, 대화 실행 단위, Web Stream과 AbortSignal 경계.
 - `AppError`/`errorResponse` (`src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`): HTTP 상태와 공개 가능한 오류 메시지.
 - `voiceRef` (`src/lib/voice-catalog.ts`): 기본 이름·확장 ID·저장 custom·비저장 replica 참조 구분.
@@ -156,6 +157,7 @@ Gemini 3.8 REST v1beta → SSE / Voices
 ## 공통 관심사
 
 **로깅:** 클라이언트 재생·정리 오류는 `console.error`, 서버 공개 오류는 정제 응답을 사용한다 (`src/app/page.tsx`, `src/lib/gemini-client.ts`).
+`src/lib/tts-audio-diagnostics.ts`는 기본 비활성이며 `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`일 때만 요청별 형식·샘플 경계·바이트 수·저에너지 통계를 JSON으로 기록한다. 본문·목소리 식별자·키·PCM은 기록하지 않으며 오디오를 제거·수정하지 않는다.
 **검증:** 텍스트 길이와 오디오 형식을 경계 양쪽에서 검증한다.  
 **인증:** 별도 사용자 인증은 없으며 Gemini 인증은 `GEMINI_API_KEY` 환경 변수다.
 
