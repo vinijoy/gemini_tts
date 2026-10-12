@@ -6,14 +6,34 @@ import { POST } from "../app/api/tts/route";
 import { parseTts, MODELS, type TtsRequest } from "./tts-contract";
 import { requestGroups, wireRequest } from "./gemini-tts";
 import { dialogueParts } from "./dialogue-blocks";
+it.each([["별하","도윤"],["Alex","Sam"]])("infers %s/%s once across all blocks and ignores stale registration",(first,second)=>{
+ const raw={...dialogue(),speakers:dialogue().speakers.map((s,i)=>({...s,name:i?first:second})),turns:[{speaker:"B",text:`${first}: 하나\n${second}: 둘`,style:"앞"},{speaker:"A",text:`${second}: 셋\n${first}: 넷`,style:"뒤"}]};
+ const parsed=parseTts(raw);expect(parsed.speakers.every(s=>!("name" in s))).toBe(true);
+ expect(requestGroups(parsed).map(g=>g.map(t=>t.speaker))).toEqual([["A","B"],["B","A"]]);
+});
+it.each(["B: 먼저\n새이름: 다음","새이름: 먼저\nB: 다음"])("reserved aliases keep their stable voice when mixed with inferred names: %s",text=>{
+ const r=dialogue();r.turns=[{speaker:"A",text,style:""}];
+ expect(requestGroups(r)[0].map(t=>t.speaker)).toEqual(text.startsWith("B:")?["B","A"]:["A","B"]);
+});
+it("a timestamp never creates a numeric speaker or changes a later inferred mapping",()=>{
+ const r=dialogue();r.turns=[{speaker:"B",text:"12:30분 뒤에 만나자\n별하: 하나\n도윤: 둘",style:""}];
+ expect(requestGroups(r)[0].map(t=>({speaker:t.speaker,text:t.text}))).toEqual([{speaker:"B",text:"12:30분 뒤에 만나자\n"},{speaker:"A",text:"하나\n"},{speaker:"B",text:"둘"}]);
+});
+it("a third inferred name in a later block fails before every provider request",async()=>{
+ const r=dialogue();r.turns=[{speaker:"A",text:"별하: 하나\n도윤: 둘",style:"앞"},{speaker:"B",text:"다른사람: 셋",style:"뒤"}];
+ const f=vi.fn();vi.stubGlobal("fetch",f);
+ const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
+ expect(res.status).toBe(400);expect(await res.text()).toContain("2번째 대사에 설정된 두 화자를 넘는 이름");expect(f).not.toHaveBeenCalled();
+});
 
 it("rejects overlong speaker declarations instead of silently assigning the fallback voice",()=>{
  const r=dialogue();r.turns=[{speaker:"A",text:"이".repeat(41)+": 대사",style:""}];
  expect(()=>requestGroups(parseTts(r))).toThrow(/40자/);
 });
 it("preserves continuation CRLF, tags, Unicode and whitespace while removing only speaker separators",()=>{
- const r=dialogue();r.speakers[0].name="  가 나  ";r.speakers[1].name="é";
+ const r=dialogue();
  const block={speaker:"B",text:"서문 👩‍👩‍👧‍👦\r\n  가 나：  <laugh>안녕\r\n계속\r\n\r\né:\r\n  끝  ",style:" \n연출  "};
+ r.turns=[block];
  expect(dialogueParts(parseTts(r),block,0).parts).toEqual([
   {speaker:"B",text:"서문 👩‍👩‍👧‍👦\r\n",style:block.style},
   {speaker:"A",text:" <laugh>안녕\r\n계속\r\n\r\n",style:block.style},
@@ -24,20 +44,14 @@ it("plain dialogue keeps fallback voice and URLs, timestamps and mid-sentence co
  const r=dialogue();const block={speaker:"B",text:"https://example.test:8080\n12:30 오후\n대사, 설명: 그대로\n",style:" 연출 "};
  expect(dialogueParts(r,block,0)).toEqual({parts:[block],named:false});
 });
-it("registered numeric names take precedence over timestamp detection",()=>{
- const r=dialogue();r.speakers[0].name="12";
- const block={speaker:"B",text:"12:30분 뒤에 만나자",style:" 숫자 이름 연출 "};
- expect(dialogueParts(parseTts(r),block,0)).toEqual({parts:[{...block,speaker:"A",text:"30분 뒤에 만나자"}],named:true});
- expect(dialogueParts(dialogue(),block,0)).toEqual({parts:[block],named:false});
-});
 it.each(MODELS.flatMap(model=>["prebuilt-dialogue","custom-dialogue"].map(mode=>({model,mode:mode as TtsRequest["mode"]}))))("stable A/B aliases remain valid with display names: $model/$mode",({model,mode})=>{
- const r=dialogue(mode);r.model=model;r.speakers[0].name="수아";r.speakers[1].name="민재";r.turns=[{speaker:"A",text:"B: 먼저\nA: 다음",style:" 원문 연출 "}];
+ const r=dialogue(mode);r.model=model;r.turns=[{speaker:"A",text:"B: 먼저\nA: 다음",style:" 원문 연출 "}];
  const groups=requestGroups(parseTts(r));expect(groups).toHaveLength(mode==="prebuilt-dialogue"?1:2);
  expect(groups.flat().map(t=>t.speaker)).toEqual(["B","A"]);
  expect(groups.flat().map(t=>t.style)).toEqual([" 원문 연출 "," 원문 연출 "]);
 });
 it("custom named blocks send the matching single voice in utterance order",async()=>{
- const r=dialogue("custom-dialogue");r.speakers[0].name="수아";r.speakers[1]={id:"B",name:"민재",voice:{kind:"stored-custom",value:"voice_b"}};
+ const r=dialogue("custom-dialogue");r.speakers[1]={id:"B",voice:{kind:"stored-custom",value:"voice_b"}};
  r.turns=[{speaker:"A",text:"수아: 하나\n민재: 둘",style:"앞"},{speaker:"B",text:"민재: 셋\n수아: 넷",style:"뒤"}];
  const f=vi.fn().mockImplementation(()=>Promise.resolve(pcmResponse(f.mock.calls.length)));vi.stubGlobal("fetch",f);
  const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
@@ -46,21 +60,19 @@ it("custom named blocks send the matching single voice in utterance order",async
  expect(wires.map(w=>w.generationConfig.speechConfig)).toEqual(["Puck","voice_b","voice_b","Puck"].map(voice=>({voiceConfig:{voice}})));
  expect(wires.map(w=>w.contents[0].parts[0].speechMetadata)).toEqual(["앞","앞","뒤","뒤"].map(style=>({style})));
 });
-it.each(["모름: 대사","A: \nB: 대사","A: 대사\nB:  "])("preflights an invalid later block with zero provider calls: %s",async(text)=>{
+it.each(["A: \nB: 대사","A: 대사\nB:  "])("preflights an invalid later block with zero provider calls: %s",async(text)=>{
  const r=dialogue();r.turns[1].text=text;const f=vi.fn();vi.stubGlobal("fetch",f);
  const res=await POST(new NextRequest("http://localhost/api/tts",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(r)}));
- expect(res.status).toBe(400);expect(f).not.toHaveBeenCalled();if(text.startsWith("모름"))expect(await res.text()).toContain("2번째 대사의 ‘모름’");
+ expect(res.status).toBe(400);expect(f).not.toHaveBeenCalled();
 });
-it.each([["동일"," 동일 "],["B","민재"],["수아","A"],["é","é"],["줄\n바꿈","민재"],["콜론:","민재"]])("rejects duplicate, reserved or malformed names %j / %j",(a,b)=>{
- const r=dialogue();r.speakers[0].name=a;r.speakers[1].name=b;expect(()=>parseTts(r)).toThrow();
-});
+
 
 function dialogue(mode:TtsRequest["mode"]="prebuilt-dialogue"):TtsRequest {
  return {model:MODELS[0],mode,speakers:[{id:"A",voice:{kind:"prebuilt-name",value:"Puck"}},{id:"B",voice:{kind:"prebuilt-name",value:"Kore"}}],turns:[{speaker:"A",text:"가".repeat(700),style:"  다정하게\n"},{speaker:"B",text:"나".repeat(700),style:" 힘차게 "}],output:{encoding:"AUDIO_L16",sampleRate:24000},serviceTier:"standard"};
 }
 function pcmResponse(sample=1){return new Response(`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:"audio/l16;rate=24000",data:Buffer.from([sample,0]).toString("base64")}}]},finishReason:"STOP"}]})}\n\n`);}
 it("named dialogue blocks keep both configured voices and stable speakers when the second block starts with B",async()=>{
- const r={...dialogue(),speakers:dialogue().speakers.map((s,i)=>({...s,name:i?"민재":"수아"})),turns:[
+ const r={...dialogue(),turns:[
   {speaker:"A",text:"수아: 내 그 말 때문에 진짜 많이 버텼다.\n\n민재: 야, 갑자기 와 이라노.",style:" 첫 칸 연출\n"},
   {speaker:"B",text:"민재: 두 번째 칸 시작.\n수아: 그 다음 대사.",style:" 뒤 칸 연출 "},
  ]};

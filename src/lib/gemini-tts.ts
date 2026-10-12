@@ -1,7 +1,8 @@
 import { upstream } from "./gemini-client";
-import { dialogueParts } from "./dialogue-blocks";
+import { dialogueAliases, dialogueParts } from "./dialogue-blocks";
 import { AppError, object, jsonBytes, MAX_TTS_REQUEST_BYTES, MAX_TTS_REQUEST_CODE_POINTS, MAX_TTS_REQUESTS, type TtsRequest } from "./tts-contract";
 import { base64Bytes, decodeAudio, joinBytes, MAX_AUDIO_BYTES } from "../utils/audio-format";
+import { createAudioDiagnostics } from "./tts-audio-diagnostics";
 // REST의 처리 등급은 generationConfig 내부가 아닌 요청 최상위 필드다.
 export function wireRequest(request:TtsRequest,turns=request.turns){const single=request.mode!=="prebuilt-dialogue";const speaker=request.speakers.find(s=>s.id===turns[0].speaker)!;return {contents:[{role:"user",parts:turns.map(t=>({text:t.text,speechMetadata:{style:t.style,...(!single?{speaker:t.speaker}:{})}}))}],generationConfig:{responseModalities:["AUDIO"],responseFormat:{audio:{mimeType:request.output.encoding,sampleRate:request.output.sampleRate}},speechConfig:single?{voiceConfig:{voice:speaker.voice.value}}:{multiSpeakerVoiceConfig:{speakerVoiceConfigs:request.speakers.map(s=>({speaker:s.id,voiceConfig:{voice:s.voice.value}}))}}},service_tier:request.serviceTier};}
 type Turn = TtsRequest["turns"][number];
@@ -13,6 +14,7 @@ function textAtoms(text:string):string[] {
 }
 export function requestGroups(request:TtsRequest):Turn[][] {
  const groups:Turn[][]=[];
+ const aliases=dialogueAliases(request);
  const fits=(turns:Turn[])=>turns.reduce((n,t)=>n+Array.from(t.text).length,0)<=MAX_TTS_REQUEST_CODE_POINTS&&jsonBytes(wireRequest(request,turns))<=MAX_TTS_REQUEST_BYTES;
  const append=(turn:Turn|Turn[])=>{
   // 직접 추가한 대사는 연출과 맥락을 따로 지정한 요청 경계다.
@@ -20,7 +22,7 @@ export function requestGroups(request:TtsRequest):Turn[][] {
   if(groups.length>MAX_TTS_REQUESTS)throw new AppError(400,"분할 생성이 작업당 128회 제한을 넘은 상태입니다.");
  };
  for(const [index,turn] of request.turns.entries()){
-  const parsed=dialogueParts(request,turn,index);
+  const parsed=dialogueParts(request,turn,index,aliases);
   if(parsed.named){
    const planned=request.mode==="prebuilt-dialogue"?[parsed.parts]:parsed.parts.map(part=>[part]);
    for(const parts of planned){if(!fits(parts))throw new AppError(400,`${index+1}번째 대사의 다화자 내용이 요청 용량을 넘은 상태입니다.`);append(parts);}
@@ -50,5 +52,59 @@ export async function* sse(response:Response,signal:AbortSignal):AsyncGenerator<
  if(!response.body)throw new AppError(502,"음성 응답이 없는 상태입니다.");const reader=response.body.getReader(),decoder=new TextDecoder();let buffer="";const cancel=()=>{void reader.cancel(signal.reason).catch(()=>{});};signal.addEventListener("abort",cancel,{once:true});try{while(true){signal.throwIfAborted();const {done,value}=await reader.read();signal.throwIfAborted();buffer+=(done?decoder.decode():decoder.decode(value,{stream:true}));buffer=buffer.replace(/\r\n/g,"\n");if(buffer.length>MAX_AUDIO_BYTES*1.5)throw new AppError(413,"음성 응답이 앱 제한을 넘은 상태입니다.");let end;while((end=buffer.indexOf("\n\n"))>=0){const event=buffer.slice(0,end);buffer=buffer.slice(end+2);const data=event.split("\n").filter(l=>l.startsWith("data:")).map(l=>l.slice(5).trimStart()).join("\n");if(data&&data!=="[DONE]"){let parsed:unknown;try{parsed=JSON.parse(data);}catch{throw new AppError(502,"음성 응답 형식이 올바르지 않은 상태입니다.");}yield parsed;}}if(done){if(buffer.trim())throw new AppError(502,"음성 스트림이 잘린 상태입니다.");return;}}}finally{signal.removeEventListener("abort",cancel);await reader.cancel().catch(()=>{});reader.releaseLock();}}
 export function responseAudio(value:unknown):{data:Uint8Array;mime:string;finish?:string}[]{const response=object(value);if(response.error)throw new AppError(502,"음성 생성에 실패한 상태입니다. 다시 시도하세요.");if(!Array.isArray(response.candidates)||response.candidates.length===0)return [];const candidate=object(response.candidates[0]);const finish=typeof candidate.finishReason==="string"?candidate.finishReason:undefined;if(finish&&finish!=="STOP")throw new AppError(502,"음성 생성이 정상적으로 끝나지 않은 상태입니다. 대본을 확인하고 다시 시도하세요.",finish==="OTHER"?0:null);const content=candidate.content?object(candidate.content):{};const parts=Array.isArray(content.parts)?content.parts:[];const audio=parts.flatMap(part=>{const p=object(part);if(!p.inlineData)return [];const inline=object(p.inlineData);if(typeof inline.data!=="string"||typeof inline.mimeType!=="string")throw new AppError(502,"오디오 정보가 불완전한 상태입니다.");return [{data:base64Bytes(inline.data),mime:inline.mimeType,finish}];});return audio.length?audio:[{data:new Uint8Array(),mime:"",finish}];}
 function wait(ms:number,signal:AbortSignal){return new Promise<void>((resolve,reject)=>{signal.throwIfAborted();const abort=()=>{clearTimeout(timer);reject(signal.reason);};const timer=setTimeout(()=>{signal.removeEventListener("abort",abort);resolve();},ms);signal.addEventListener("abort",abort,{once:true});});}
-export async function* synthesize(request:TtsRequest,signal:AbortSignal,meta:{tier:string}):AsyncGenerator<Uint8Array>{let emitted=false,total=0;const groups=requestGroups(request);for(const turns of groups){let attempts=0;while(true){signal.throwIfAborted();let stopped=false,length=0;const buffered:Uint8Array[]=[];let wavMime="";try{const response=await upstream(`/v1beta/models/${request.model}:streamGenerateContent?alt=sse`,{method:"POST",body:JSON.stringify(wireRequest(request,turns)),signal});const tier=response.headers.get("x-gemini-service-tier");meta.tier=groups.length===1&&["standard","flex","priority"].includes(tier??"")?tier!:"unknown";for await(const event of sse(response,signal)){const parts=responseAudio(event);if(stopped&&parts.some(p=>p.data.length))throw new AppError(502,"완료 이후 오디오가 반환된 상태입니다.");for(const part of parts){if(part.finish)stopped=true;if(!part.data.length)continue;length+=part.data.length;if(length>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");if(request.output.encoding==="AUDIO_WAV"){if(wavMime&&wavMime!==part.mime)throw new AppError(502,"오디오 형식이 변경된 상태입니다.");wavMime=part.mime;buffered.push(part.data);}else{const pcm=decodeAudio(part.data,part.mime,request.output);total+=pcm.length;if(total>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");emitted=true;yield pcm;}}}if(!stopped||!length)throw new AppError(502,"음성 완료 응답이 없거나 오디오가 빈 상태입니다. 다시 시도하세요.");if(request.output.encoding==="AUDIO_WAV"){const pcm=decodeAudio(joinBytes(buffered),wavMime,request.output);total+=pcm.length;if(total>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");emitted=true;yield pcm;}if(total%2)throw new AppError(502,"PCM 오디오가 잘린 상태입니다.");break;}catch(e){if(signal.aborted)throw e;if(!emitted&&e instanceof AppError&&(e.status===429||e.status===502)&&e.retryAfterMs!==null&&attempts++<1){await wait(e.retryAfterMs!,signal);continue;}throw e;}}}}
+export async function* synthesize(request:TtsRequest,signal:AbortSignal,meta:{tier:string}):AsyncGenerator<Uint8Array>{
+ let emitted=false,total=0;
+ const groups=requestGroups(request),diagnostics=createAudioDiagnostics(request);
+ for(const [requestIndex,turns] of groups.entries()){
+  let attempts=0;
+  while(true){
+   signal.throwIfAborted();
+   let stopped=false,length=0,completed=false;
+   const buffered:Uint8Array[]=[],trace=diagnostics?.begin(requestIndex,attempts,total);
+   let wavMime="";
+   try{
+    const response=await upstream(`/v1beta/models/${request.model}:streamGenerateContent?alt=sse`,{method:"POST",body:JSON.stringify(wireRequest(request,turns)),signal});
+    const tier=response.headers.get("x-gemini-service-tier");
+    meta.tier=groups.length===1&&["standard","flex","priority"].includes(tier??"")?tier!:"unknown";
+    for await(const event of sse(response,signal)){
+     const parts=responseAudio(event);
+     if(stopped&&parts.some(p=>p.data.length))throw new AppError(502,"완료 이후 오디오가 반환된 상태입니다.");
+     for(const part of parts){
+      if(part.finish)stopped=true;
+      if(!part.data.length)continue;
+      trace?.source(part.data,part.mime);
+      length+=part.data.length;
+      if(length>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");
+      if(request.output.encoding==="AUDIO_WAV"){
+       if(wavMime&&wavMime!==part.mime)throw new AppError(502,"오디오 형식이 변경된 상태입니다.");
+       wavMime=part.mime;buffered.push(part.data);
+      }else{
+       const pcm=decodeAudio(part.data,part.mime,request.output);
+       total+=pcm.length;
+       if(total>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");
+       trace?.decoded(pcm);
+       emitted=true;yield pcm;
+      }
+     }
+    }
+    if(!stopped||!length)throw new AppError(502,"음성 완료 응답이 없거나 오디오가 빈 상태입니다. 다시 시도하세요.");
+    if(request.output.encoding==="AUDIO_WAV"){
+     const pcm=decodeAudio(joinBytes(buffered),wavMime,request.output);
+     total+=pcm.length;
+     if(total>MAX_AUDIO_BYTES)throw new AppError(413,"오디오가 앱 제한을 넘은 상태입니다.");
+     trace?.decoded(pcm);
+     emitted=true;yield pcm;
+    }
+    if(total%2)throw new AppError(502,"PCM 오디오가 잘린 상태입니다.");
+    completed=true;break;
+   }catch(e){
+    if(signal.aborted)throw e;
+    if(!emitted&&e instanceof AppError&&(e.status===429||e.status===502)&&e.retryAfterMs!==null&&attempts++<1){await wait(e.retryAfterMs!,signal);continue;}
+    throw e;
+   }finally{
+    trace?.finish(completed?"completed":signal.aborted?"aborted":"incomplete");
+   }
+  }
+ }
+}
 export async function openPcm(request:TtsRequest,signal:AbortSignal){const abort=new AbortController();const forward=()=>abort.abort(signal.reason);signal.addEventListener("abort",forward,{once:true});if(signal.aborted)forward();const meta={tier:"unknown"};const iterator=synthesize(request,abort.signal,meta);const clean=()=>signal.removeEventListener("abort",forward);let first:IteratorResult<Uint8Array>;try{first=await iterator.next();}catch(e){clean();abort.abort();await iterator.return(undefined);throw e;}let closed=false;const stream=new ReadableStream<Uint8Array>({async pull(controller){if(closed)return;try{abort.signal.throwIfAborted();const result=first;first={done:true,value:undefined};if(!result.done){controller.enqueue(result.value);return;}const next=await iterator.next();if(closed)return;if(next.done){closed=true;clean();controller.close();}else controller.enqueue(next.value);}catch(e){closed=true;clean();abort.abort();await iterator.return(undefined).catch(()=>{});controller.error(e);}},async cancel(){closed=true;clean();abort.abort();await iterator.return(undefined).catch(()=>{});}});return {stream,tier:meta.tier};}

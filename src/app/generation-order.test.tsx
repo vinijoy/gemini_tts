@@ -72,17 +72,17 @@ it.each(["prebuilt-dialogue", "custom-dialogue"])("%s 안내는 한 칸의 두 �
   expect(screen.getByLabelText("발화 2 화자")).toHaveValue("B");
   expect(screen.getByLabelText("발화 2 대본")).toBeVisible();
 });
-it("화자 이름은 선택 모드 뒤에서 탐색하며 탭·모델·화자 모드 왕복에도 유지된다",async()=>{
+it("이름 등록 입력 없이 모델·모드·탭을 왕복하며 대본을 유지한다",async()=>{
  const user=userEvent.setup();render(<Home/>);
  expect(screen.queryByLabelText("첫 번째 화자 대본 이름")).not.toBeInTheDocument();
  await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
- const first=screen.getByLabelText("첫 번째 화자 대본 이름"),second=screen.getByLabelText("두 번째 화자 대본 이름");
- expect(first).toHaveValue("");expect(second).toHaveValue("");await user.type(first,"별하");await user.type(second,"도윤");
- expectOrder([screen.getByLabelText("화자 모드"),first,second,screen.getByLabelText("음성 선택")]);
- first.focus();await user.tab();expect(second).toHaveFocus();
+ expect(screen.queryByLabelText("첫 번째 화자 대본 이름")).not.toBeInTheDocument();
+ const script=screen.getByLabelText("음성으로 변환할 텍스트 입력창");await user.type(script,"별하: 하나\n도윤: 둘");
+ expectOrder([screen.getByLabelText("화자 모드"),screen.getByLabelText("음성 선택"),script]);
  await user.selectOptions(screen.getByLabelText("모델"),"gemini-3.8-flash-lite-tts");
  await user.selectOptions(screen.getByLabelText("음성 선택"),"Aoede");
  await user.selectOptions(screen.getByLabelText("화자 모드"),"single");await user.selectOptions(screen.getByLabelText("화자 모드"),"custom-dialogue");
  await user.click(screen.getByRole("tab",{name:"목소리 제작·관리"}));await user.click(screen.getByRole("tab",{name:"음성 만들기"}));
- expect(screen.getByLabelText("첫 번째 화자 대본 이름")).toHaveValue("별하");expect(screen.getByLabelText("두 번째 화자 대본 이름")).toHaveValue("도윤");
+ expect(screen.queryByLabelText("첫 번째 화자 대본 이름")).not.toBeInTheDocument();expect(screen.queryByLabelText("두 번째 화자 대본 이름")).not.toBeInTheDocument();
+ expect(screen.getByLabelText("음성으로 변환할 텍스트 입력창")).toHaveValue("별하: 하나\n도윤: 둘");
 });

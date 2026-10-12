@@ -72,7 +72,7 @@ Next.js 특수 파일은 `page.tsx`, `layout.tsx`, `route.ts`다. 일반 파일�
 
 ## 새 코드 추가 위치
 
-- 대화 입력 회귀(261012-boh): 입력 블록과 발화를 동일시하지 않는다. 여러 블록 각각에 여러 등록 이름·다른 연출·반대 화자부터 시작하는 fixture를 넣어 실제 POST의 wire metadata와 PCM 순서를 검사한다. 예시 이름을 소스 기본값으로 고정하거나 등장 순서로 화자를 추측하지 않는다. `src/lib/dialogue-blocks.ts`가 이름→stable id를 해석하며 기본 대화는 매 블록에 두 voice configs와 발화별 speaker parts, 맞춤 대화는 발화별 single voice를 보낸다. 회귀: `npm test -- src/lib/gemini-tts.test.ts src/app/page.test.tsx src/app/generation-order.test.tsx`. 새 이름 필드 VoiceOver·두 블록 청취는 대기다.
+- 대화 입력 회귀(261012-boh): 입력 블록과 발화를 동일시하지 않는다. 여러 블록 각각에 여러 등록 이름·다른 연출·반대 화자부터 시작하는 fixture를 넣어 실제 POST의 wire metadata와 PCM 순서를 검사한다. 예시 이름을 고정하거나 별도 등록을 요구하지 않는다. 사용자 결정에 따라 전체 요청에서 처음 나온 이름을 A, 다음 이름을 B로 한 번만 연결하고 모든 블록에 재사용한다. A/B 직접 표기는 고정 목소리를 유지하며 세 번째 다른 이름은 사전 거부한다. `src/lib/dialogue-blocks.ts`가 이름→stable id를 해석하며 기본 대화는 매 블록에 두 voice configs와 발화별 speaker parts, 맞춤 대화는 발화별 single voice를 보낸다. 회귀: `npm test -- src/lib/gemini-tts.test.ts src/app/page.test.tsx src/app/generation-order.test.tsx`. 등록 입력 제거 후 안내의 VoiceOver·두 블록 청취는 대기다.
 
 - 생성 탭 UI 순서: 모델·화자 → 목소리 → 대본·말투·태그·추가 발화 → 출력 → 생성·결과를 DOM과 화면에 동일하게 유지한다. h2 제목으로 구역을 탐색하며 CSS order나 양수 tabindex로 순서를 따로 만들지 않는다. 화자 B 기본 목소리는 기본 목소리 영역에, 추가 발화는 첫 대본 뒤에 둔다. 확장 방식에서는 중복 기본 선택 메뉴를 노출하지 않는다. `src/app/generation-order.test.tsx`의 DOM/Tab 순서·입력 보존과 `src/app/page.test.tsx`의 숨은 메뉴 회귀를 실행한다. 2026-10-11 사용자 VoiceOver 확인은 이 배치에 한하며 새 변경의 실기 확인을 대체하지 않는다.
 
