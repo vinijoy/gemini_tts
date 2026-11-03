@@ -133,7 +133,7 @@ export default function Home() {
         if (isLoading)
             return;
         if (!text.trim()) {
-            setError("변환할 텍스트를 입력해주세요.");
+            setError("변환할 대본을 입력해주세요.");
             return;
         }
         let snapshot: TtsRequest;
@@ -396,7 +396,7 @@ export default function Home() {
         </header>
 
         <section className="space-y-6">
-          <p>처음에는 대본을 입력하고 목소리를 고른 뒤 ‘음성 생성 시작’을 누르세요. 말투를 바꾸고 싶으면 ‘읽는 말투와 감정’을 입력하세요.</p>
+          <p>처음에는 대본을 입력하고 목소리를 고른 뒤 ‘음성 생성 시작’을 누르세요. 말투를 바꾸고 싶으면 ‘연출 지시’를 입력하세요.</p>
           <div role="tablist" aria-label="음성 작업" className="flex flex-wrap gap-2 border-b border-purple-200 pb-3">
             {tabs.map((tab, index) => <button
               key={tab.id}
@@ -426,12 +426,12 @@ export default function Home() {
           </TabPanel>
           <TabPanel active={activeTab === "generate"} id="panel-generate" aria-labelledby="tab-generate" tabIndex={0} className="space-y-6">
           <section aria-labelledby="generation-setup" className="space-y-4">
-            <h2 id="generation-setup" className="text-lg font-bold text-purple-900">1. 모델과 화자</h2>
+            <h2 id="generation-setup" className="text-lg font-bold text-purple-900">모델과 화자</h2>
           <TtsEditor section="setup" value={options} onChange={setOptions} disabled={isLoading}/>
           </section>
 
           <section aria-labelledby="generation-voices" className="space-y-4">
-            <h2 id="generation-voices" className="text-lg font-bold text-purple-900">2. 목소리 선택</h2>
+            <h2 id="generation-voices" className="text-lg font-bold text-purple-900">목소리 선택</h2>
           <fieldset className="space-y-2">
             <legend className="font-semibold text-gray-700">목소리 선택 방법</legend>
             <div className="flex flex-wrap gap-2">
@@ -487,21 +487,21 @@ export default function Home() {
           </section>
 
           <section aria-labelledby="generation-script" className="space-y-4">
-            <h2 id="generation-script" className="text-lg font-bold text-purple-900">3. 대본과 연출</h2>
-          {/* 텍스트 입력부 */}
+            <h2 id="generation-script" className="text-lg font-bold text-purple-900">대본과 연출</h2>
+          {/* 대본 입력부 */}
           <div className="flex flex-col space-y-2">
             <label htmlFor="tts-text" className="font-semibold text-gray-700">
-              변환할 텍스트
+              변환할 대본
             </label>
-            <textarea id="tts-text" className="w-full h-32 p-4 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none" placeholder="음성으로 변환할 텍스트를 입력해주세요..." value={text} maxLength={maxTextLength} onChange={(e) => setText(e.target.value.slice(0, maxTextLength))} disabled={isLoading} aria-label="음성으로 변환할 텍스트 입력창"/>
+            <textarea id="tts-text" className="w-full h-32 p-4 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none" placeholder="음성으로 변환할 대본을 입력해주세요..." value={text} maxLength={maxTextLength} onChange={(e) => setText(e.target.value.slice(0, maxTextLength))} disabled={isLoading} aria-label="음성으로 변환할 대본 입력창"/>
           </div>
 
-          {/* 스타일/감정 입력창 */}
+          {/* 연출 지시 입력창 */}
           <div className="flex flex-col space-y-2">
             <label htmlFor="style-prompt" className="font-semibold text-gray-700">
-              읽는 말투와 감정
+              연출 지시
             </label>
-            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} maxLength={1000} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="스타일 및 감정 입력창"/>
+            <textarea id="style-prompt" className="w-full h-24 p-3 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white/50 transition-all resize-none disabled:opacity-50 disabled:cursor-not-allowed" placeholder="예: 차분하고 신뢰감 있는 톤" value={stylePrompt} maxLength={1000} onChange={(e) => setStylePrompt(e.target.value)} disabled={isLoading} aria-label="연출 지시 입력창"/>
           </div>
 
 
@@ -520,7 +520,7 @@ export default function Home() {
                   {tag.label}
                 </button>))}
             </div>
-            <p className="text-xs text-gray-500">※ 텍스트 내에 태그를 삽입하여 풍부한 감정 변화를 연출해 보세요. (안정적인 오디오 품질을 위해 태그의 연속 사용은 피해주시기 바랍니다.)</p>
+            <p className="text-xs text-gray-500">※ 대본 내에 태그를 삽입하여 풍부한 감정 변화를 연출해 보세요. (안정적인 오디오 품질을 위해 태그의 연속 사용은 피해주시기 바랍니다.)</p>
           </div>
 
           {options.mode !== "single" && <TtsEditor section="turns" value={options} onChange={setOptions} disabled={isLoading}/>}
@@ -528,12 +528,12 @@ export default function Home() {
           </section>
 
           <section aria-labelledby="generation-output" className="space-y-4">
-            <h2 id="generation-output" className="text-lg font-bold text-purple-900">4. 출력 설정</h2>
+            <h2 id="generation-output" className="text-lg font-bold text-purple-900">출력 설정</h2>
           <TtsEditor section="output" value={options} onChange={setOptions} disabled={isLoading}/>
           </section>
 
           <section aria-labelledby="generation-result" className="space-y-4">
-            <h2 id="generation-result" className="text-lg font-bold text-purple-900">5. 음성 생성과 결과</h2>
+            <h2 id="generation-result" className="text-lg font-bold text-purple-900">음성 생성과 결과</h2>
           {/* 버튼부 */}
           <button onClick={handleGenerate} disabled={isLoading} className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 ${isLoading
             ? "bg-gray-400 cursor-not-allowed"

@@ -66,7 +66,7 @@ export default function VoiceLibrary({label,onSelect,disabled=false,searchOnly=f
  <label>목록 출처<select disabled={controlsDisabled} value={catalogSource} onChange={event=>{reset();setCatalogSource(event.target.value);setSource("prebuilt");}}><option value="provided">사용자 제공 목록 (2026-10-01)</option><option value="remote">현재 계정</option></select></label>
  <label>목소리 종류<select disabled={controlsDisabled} value={source} onChange={event=>{reset();setSource(event.target.value);if(event.target.value!=="prebuilt")setCatalogSource("remote");}}><option value="prebuilt">제공되는 목소리</option><option value="prompted">설명으로 만들어 저장한 목소리</option><option value="replicated">녹음으로 복제해 저장한 목소리</option></select></label>
  <p>제공 목록의 목소리를 현재 계정에서 사용할 수 있는지는 음성 생성 시 확인됩니다.</p>
- <button type="button" disabled={controlsDisabled} ref={queryButton} onClick={()=>void load(true)}>목록 조회</button>
+ <button type="button" disabled={controlsDisabled} ref={queryButton} onClick={()=>void load(true)}>목록 새로고침</button>
  <Announce message={message}/>
  {loaded&&<Announce message={`조건에 맞는 목소리는 ${candidates.length}개입니다.`}/>}
 

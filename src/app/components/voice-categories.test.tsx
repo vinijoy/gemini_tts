@@ -13,7 +13,7 @@ it("앞 카테고리에 맞는 후보만 보여주고 상위 변경 시 하위 �
  vi.stubGlobal("fetch",vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify({voices,nextPageToken:""})))));
  const select=vi.fn(), user=userEvent.setup();
  render(<VoiceLibrary label="화자 A" searchOnly onSelect={select}/>);
- await waitFor(()=>expect(screen.getByRole("button",{name:"목록 조회"})).toBeEnabled());
+ await waitFor(()=>expect(screen.getByRole("button",{name:"목록 새로고침"})).toBeEnabled());
  const language=await screen.findByRole("combobox",{name:"화자 A 언어"});
  await user.selectOptions(language,"ko-KR");
  expect(within(screen.getByRole("combobox",{name:"화자 A 지역"})).queryByRole("option",{name:/미국/})).toBeNull();
@@ -31,7 +31,7 @@ it("앞 카테고리에 맞는 후보만 보여주고 상위 변경 시 하위 �
 it("다음 페이지의 목소리도 카테고리에 포함하고 메타데이터 누락은 미분류로 고른다",async()=>{
  vi.stubGlobal("fetch",vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({voices:[voices[0]],nextPageToken:"next"}))).mockResolvedValueOnce(new Response(JSON.stringify({voices:[{id:"unknown",name:"미분류 음성",type:"prompted"}],nextPageToken:""}))));
  const user=userEvent.setup();render(<VoiceLibrary label="화자 A" searchOnly onSelect={()=>{}}/>);
- await waitFor(()=>expect(screen.getByRole("button",{name:"목록 조회"})).toBeEnabled());
+ await waitFor(()=>expect(screen.getByRole("button",{name:"목록 새로고침"})).toBeEnabled());
  const language=await screen.findByRole("combobox",{name:"화자 A 언어"});
  await user.selectOptions(language,"__unknown__");
  expect(within(screen.getByRole("combobox",{name:"화자 A 목소리"})).getByRole("option",{name:/미분류 음성/})).toBeInTheDocument();
@@ -39,7 +39,7 @@ it("다음 페이지의 목소리도 카테고리에 포함하고 메타데이�
 it("목록 출처를 바꾸면 이전 후보를 제거하고 재조회 전에는 선택할 수 없다",async()=>{
  vi.stubGlobal("fetch",vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({voices,nextPageToken:""}))).mockImplementation(()=>new Promise(()=>{})));
  const user=userEvent.setup();render(<VoiceLibrary label="화자 A" searchOnly onSelect={()=>{}}/>);
- await waitFor(()=>expect(screen.getByRole("button",{name:"목록 조회"})).toBeEnabled());
+ await waitFor(()=>expect(screen.getByRole("button",{name:"목록 새로고침"})).toBeEnabled());
  expect(await screen.findByRole("combobox",{name:"화자 A 목소리"})).toBeEnabled();
  await user.selectOptions(screen.getByRole("combobox",{name:"목록 출처"}),"remote");
  expect(screen.getByRole("combobox",{name:"화자 A 목소리"})).toBeDisabled();
@@ -47,10 +47,10 @@ it("목록 출처를 바꾸면 이전 후보를 제거하고 재조회 전에는
 it("페이지가 반복되면 불완전한 목록으로 분류하지 않고 재조회를 허용한다",async()=>{
  vi.stubGlobal("fetch",vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify({voices,nextPageToken:"same"})))));
  render(<VoiceLibrary label="화자 A" searchOnly onSelect={()=>{}}/>);
- await waitFor(()=>expect(screen.getByRole("button",{name:"목록 조회"})).toBeEnabled());
+ await waitFor(()=>expect(screen.getByRole("button",{name:"목록 새로고침"})).toBeEnabled());
  expect(await screen.findByText("목소리 목록 전체를 확인하지 못했습니다. 다시 조회하세요.")).toBeVisible();
  expect(screen.getByRole("combobox",{name:"화자 A 목소리"})).toBeDisabled();
- expect(screen.getByRole("button",{name:"목록 조회"})).toBeEnabled();
+ expect(screen.getByRole("button",{name:"목록 새로고침"})).toBeEnabled();
 });
 it("확장 화면에 독립된 네이티브 select를 바로 노출하고 자동으로 목록을 불러온다",async()=>{
  vi.stubGlobal("fetch",vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify({voices,nextPageToken:""})))));
@@ -70,12 +70,12 @@ it("라이브러리는 반복 낭독할 그룹 없이 입력 이름과 비활성
  const {rerender}=render(<VoiceLibrary label="화자 A" onSelect={()=>{}}/>);
  expect(screen.queryByRole("group",{name:"화자 A 목소리 라이브러리"})).toBeNull();
  expect(screen.getByRole("heading",{name:"화자 A 목소리 라이브러리"})).toBeVisible();
- for(const control of [...screen.getAllByRole("combobox"),screen.getByRole("button",{name:"목록 조회"})]){
+ for(const control of [...screen.getAllByRole("combobox"),screen.getByRole("button",{name:"목록 새로고침"})]){
   expect(control).toBeDisabled();
  }
  await waitFor(()=>expect(screen.getByRole("combobox",{name:"화자 A 지역"})).toBeEnabled());
  rerender(<VoiceLibrary label="화자 A" disabled onSelect={()=>{}}/>);
- for(const control of [...screen.getAllByRole("combobox"),screen.getByRole("button",{name:"목록 조회"})]){
+ for(const control of [...screen.getAllByRole("combobox"),screen.getByRole("button",{name:"목록 새로고침"})]){
   expect(control).toBeDisabled();
  }
 });

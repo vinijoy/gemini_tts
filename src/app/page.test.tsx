@@ -36,12 +36,12 @@ vi.mock("@/utils/streaming-player", () => ({
 }));
 let streamController!: ReadableStreamDefaultController<Uint8Array>;
 let streamSettled = false;
-it("목록 조회가 끝나면 키보드 초점을 조회 버튼으로 복원한다",async()=>{streamSettled=true;vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({voices:[],nextPageToken:""}))));const user=userEvent.setup();render(<VoiceLibrary label="화자 A" onSelect={()=>{}}/>);const button=screen.getByRole("button",{name:"목록 조회"});await user.click(button);await waitFor(()=>expect(button).toHaveFocus());expect(fetch).toHaveBeenCalledWith(expect.stringContaining("source=provided"),expect.anything());});
+it("목록 새로고침이 끝나면 키보드 초점을 조회 버튼으로 복원한다",async()=>{streamSettled=true;vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({voices:[],nextPageToken:""}))));const user=userEvent.setup();render(<VoiceLibrary label="화자 A" onSelect={()=>{}}/>);const button=screen.getByRole("button",{name:"목록 새로고침"});await user.click(button);await waitFor(()=>expect(button).toHaveFocus());expect(fetch).toHaveBeenCalledWith(expect.stringContaining("source=provided"),expect.anything());});
 
 it("기능 탭을 키보드로 이동하며 입력과 제작 초안을 유지한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "유지할 대본");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "유지할 대본");
     const generationTab = screen.getByRole("tab", {name: "음성 만들기"});
     expect(generationTab).toHaveAttribute("aria-selected", "true");
     generationTab.focus();
@@ -49,7 +49,7 @@ it("기능 탭을 키보드로 이동하며 입력과 제작 초안을 유지한
     const studioTab = screen.getByRole("tab", {name: "목소리 제작·관리"});
     expect(studioTab).toHaveFocus();
     expect(studioTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("textbox", {name: "음성으로 변환할 텍스트 입력창"})).toBeNull();
+    expect(screen.queryByRole("textbox", {name: "음성으로 변환할 대본 입력창"})).toBeNull();
     await user.type(screen.getByLabelText(/설계 설명/), "유지할 목소리 설명");
     studioTab.focus();
     await user.keyboard("{End}");
@@ -58,7 +58,7 @@ it("기능 탭을 키보드로 이동하며 입력과 제작 초안을 유지한
     expect(screen.getByRole("region", {name: "목소리 제작과 관리"})).toBeVisible();
     await user.keyboard("{ArrowRight}");
     expect(generationTab).toHaveFocus();
-    expect(screen.getByLabelText("음성으로 변환할 텍스트 입력창")).toHaveValue("유지할 대본");
+    expect(screen.getByLabelText("음성으로 변환할 대본 입력창")).toHaveValue("유지할 대본");
     await user.keyboard("{ArrowLeft}");
     expect(screen.getByLabelText(/설계 설명/)).toHaveValue("유지할 목소리 설명");
     studioTab.focus();
@@ -146,7 +146,7 @@ it("제작 탭 왕복에서 선택값과 빈 직접 입력 모드·첨부 File·
 it("숨은 생성 탭에서도 스트림을 끝까지 유지하고 결과를 복원한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "탭 밖 생성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "탭 밖 생성");
     await user.click(screen.getByRole("button", {name: "음성 생성하기 버튼"}));
     const requestSignal = vi.mocked(fetch).mock.calls[0][1]?.signal;
     await user.click(screen.getByRole("tab", {name: "목소리 제작·관리"}));
@@ -240,7 +240,7 @@ it("화면 제출부터 실제 POST와 REST 응답을 거쳐 완료 WAV까지 �
     }));
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "통합 검사");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "통합 검사");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     await screen.findByRole("link", { name: "생성된 음성 파일 다운로드" });
     expect(player.enqueue).toHaveBeenCalledWith(new Int16Array([1, 2]));
@@ -256,8 +256,8 @@ it("이름 등록 없이 두 대화 상자의 첫 등장 순서를 유지하고 
  vi.stubGlobal("fetch",vi.fn((url,init)=>url==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):calls(url,init)));
  const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
  expect(screen.queryByLabelText("첫 번째 화자 대본 이름")).not.toBeInTheDocument();expect(screen.queryByLabelText("두 번째 화자 대본 이름")).not.toBeInTheDocument();
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"수아: 내 그 말 때문에 진짜 많이 버텼다.\n\n민재: 야, 갑자기 와 이라노."}});
- fireEvent.change(screen.getByLabelText("스타일 및 감정 입력창"),{target:{value:" 첫 연출\n"}});
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 대본 입력창"),{target:{value:"수아: 내 그 말 때문에 진짜 많이 버텼다.\n\n민재: 야, 갑자기 와 이라노."}});
+ fireEvent.change(screen.getByLabelText("연출 지시 입력창"),{target:{value:" 첫 연출\n"}});
  await user.click(screen.getByRole("button",{name:"대사 추가"}));
  fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"민재: 다음 대화.\n수아: 그래."}});fireEvent.change(screen.getByLabelText("발화 2 연출"),{target:{value:" 뒤 연출 "}});
  await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));expect(await screen.findByRole("link",{name:"생성된 음성 파일 다운로드"})).toBeVisible();
@@ -270,7 +270,7 @@ it("뒤 칸의 세 번째 이름은 생성 전에 알려 주고 대본을 유지
  streamSettled=true;vi.spyOn(console,"error").mockImplementation(()=>{});
  const provider=vi.fn();vi.stubGlobal("fetch",vi.fn((url,init)=>url==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):provider(url,init)));
  const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"A: 첫 대사\nB: 다음 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 대본 입력창"),{target:{value:"A: 첫 대사\nB: 다음 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));
  fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"미등록: 뒤 대사"}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
  expect(await screen.findByRole("alert")).toHaveTextContent("2번째 대사에 설정된 두 화자를 넘는 이름이 있는 상태입니다.");
  expect(screen.getByLabelText("발화 2 대본")).toHaveValue("미등록: 뒤 대사");expect(provider).not.toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();
@@ -316,7 +316,7 @@ afterEach(() => {
 it("본문 입력과 태그 추가를 1,000자에서 원천 차단한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    const textInput = screen.getByLabelText("음성으로 변환할 텍스트 입력창");
+    const textInput = screen.getByLabelText("음성으로 변환할 대본 입력창");
     expect(textInput).toHaveAttribute("maxLength", "1000");
     fireEvent.change(textInput, { target: { value: "가".repeat(1001) } });
     expect(textInput).toHaveValue("가".repeat(1000));
@@ -328,8 +328,8 @@ it.each(["prebuilt-dialogue","custom-dialogue"])("%s 추가 대사는 각자 지
  const provider=vi.fn().mockImplementation(()=>Promise.resolve(new Response(`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:"audio/l16;rate=24000",data:Buffer.from([provider.mock.calls.length,0]).toString("base64")}}]},finishReason:"STOP"}]})}\n\n`)));
  vi.stubGlobal("fetch",vi.fn((url,init)=>String(url)==="/api/tts"?POST(new Request("http://localhost/api/tts",init)):provider(url,init)));
  const user=userEvent.setup();render(<Home />);await user.selectOptions(screen.getByLabelText("화자 모드"),mode);
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"가".repeat(1000)}});
- fireEvent.change(screen.getByLabelText("스타일 및 감정 입력창"),{target:{value:" 앞 연출 "+"한".repeat(990)}});
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 대본 입력창"),{target:{value:"가".repeat(1000)}});
+ fireEvent.change(screen.getByLabelText("연출 지시 입력창"),{target:{value:" 앞 연출 "+"한".repeat(990)}});
  await user.click(screen.getByRole("button",{name:"대사 추가"}));
  fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"나".repeat(1000)}});
  fireEvent.change(screen.getByLabelText("발화 2 연출"),{target:{value:" 뒤 연출 "+"글".repeat(990)}});
@@ -357,13 +357,13 @@ it("뒤 대사의 실패는 재생기를 닫고 완성 파일을 만들지 않�
   count++;return count===1?new Response('data: {"candidates":[{"content":{"parts":[{"inlineData":{"data":"AQACAA==","mimeType":"audio/l16;rate=24000"}}]},"finishReason":"STOP"}]}\n\n'):new Response("later failure",{status:502});
  }));
  const user=userEvent.setup();render(<Home/>);await user.selectOptions(screen.getByLabelText("화자 모드"),"prebuilt-dialogue");
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"첫 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"뒤 대사"}});
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 대본 입력창"),{target:{value:"첫 대사"}});await user.click(screen.getByRole("button",{name:"대사 추가"}));fireEvent.change(screen.getByLabelText("발화 2 대본"),{target:{value:"뒤 대사"}});
  await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));await screen.findByRole("alert");
  expect(player.close).toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();expect(screen.queryByRole("link",{name:"생성된 음성 파일 다운로드"})).not.toBeInTheDocument();expect(count).toBe(2);
 });
 it("브라우저도 32MiB 초과 오디오를 중단하고 완성 파일을 만들지 않는다",async()=>{
  vi.spyOn(console,"error").mockImplementation(()=>{});const user=userEvent.setup();render(<Home/>);
- fireEvent.change(screen.getByLabelText("음성으로 변환할 텍스트 입력창"),{target:{value:"용량 검사"}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
+ fireEvent.change(screen.getByLabelText("음성으로 변환할 대본 입력창"),{target:{value:"용량 검사"}});await user.click(screen.getByRole("button",{name:"음성 생성하기 버튼"}));
  await act(async()=>{streamController.enqueue(new Uint8Array(32*1024*1024+2));});
  expect(await screen.findByRole("alert")).toHaveTextContent("32MiB");expect(player.close).toHaveBeenCalled();expect(createObjectUrl).not.toHaveBeenCalled();
  streamSettled=true;
@@ -371,7 +371,7 @@ it("브라우저도 32MiB 초과 오디오를 중단하고 완성 파일을 만�
 it("생성 중 첫 PCM 청크를 자동 재생하고 결과 액션을 비활성화한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "안녕하세요");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "안녕하세요");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => streamController.enqueue(Uint8Array.from([0, 0])));
     await waitFor(() => expect(player.enqueue).toHaveBeenCalledOnce());
@@ -389,7 +389,7 @@ it("네트워크 요청 전에 스트리밍 플레이어 활성화를 완료한�
     }));
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "먼저 활성화할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "먼저 활성화할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     await waitFor(() => expect(player.activate).toHaveBeenCalledOnce());
     expect(fetch).not.toHaveBeenCalled();
@@ -402,7 +402,7 @@ it("플레이어 활성화가 거부되면 요청을 중단하고 한국어 오�
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "차단될 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "차단될 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("오디오 자동 재생을 시작하지 못했습니다. 브라우저의 자동 재생 권한을 확인한 뒤 다시 시도해 주세요.");
     expect(fetch).not.toHaveBeenCalled();
@@ -417,7 +417,7 @@ it("플레이어 활성화가 동기 실패해도 한국어 오류로 정규화�
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "동기 실패할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "동기 실패할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("오디오 자동 재생을 시작하지 못했습니다. 브라우저의 자동 재생 권한을 확인한 뒤 다시 시도해 주세요.");
     expect(fetch).not.toHaveBeenCalled();
@@ -434,7 +434,7 @@ it("비JSON 오류 응답 본문을 한 번만 읽고 한국어 안내로 복구
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "서버 오류를 확인할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "서버 오류를 확인할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("음성 생성 서버에서 오류가 발생했습니다. 잠시 후 다시 시도해 주세요. (서버 응답: upstream temporarily unavailable)");
     expect(readText).toHaveBeenCalledOnce();
@@ -445,7 +445,7 @@ it("비JSON 오류 응답 본문을 한 번만 읽고 한국어 안내로 복구
 it("스트림 완료 후 다시 듣기와 WAV 다운로드를 활성화한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "완료할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "완료할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -468,7 +468,7 @@ it("상태 라이브 영역을 유지하며 생성 상태 문구만 갱신한다
     render(<Home />);
     const liveStatus = screen.getByRole("status");
     expect(liveStatus).toBeEmptyDOMElement();
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "상태를 알릴 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "상태를 알릴 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     expect(liveStatus).toHaveTextContent("음성을 생성하고 있습니다. 준비되면 자동 재생됩니다.");
     act(() => {
@@ -479,7 +479,7 @@ it("상태 라이브 영역을 유지하며 생성 상태 문구만 갱신한다
 it("예약 재생을 닫은 뒤 완성 음성을 처음부터 다시 재생한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "다시 들을 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "다시 들을 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -523,7 +523,7 @@ it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하�
         .mockReturnValueOnce("blob:current-audio");
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "이전 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "이전 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -559,7 +559,7 @@ it("이전 다시 듣기의 늦은 실패가 새 결과를 막거나 오염하�
 it("새 생성을 시작하면 재생 중인 완성 오디오를 중지한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "재생 중인 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "재생 중인 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -590,7 +590,7 @@ it("스트림 오류 시 결과를 폐기하고 생성 버튼을 복구한다", 
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "중단될 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "중단될 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     const requestSignal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal;
     act(() => streamController.enqueue(Uint8Array.from([0, 0])));
@@ -608,7 +608,7 @@ it("유효 샘플 뒤 홀수 PCM 꼬리가 남으면 WAV 결과를 만들지 않
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "잘린 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "잘린 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0x00, 0x80, 0xff]));
@@ -627,7 +627,7 @@ it("새 생성 전 이전 요청과 플레이어 및 Blob URL을 정리한다", 
         .mockReturnValueOnce("blob:second-audio");
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "첫 번째 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "첫 번째 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     const fetchMock = vi.mocked(fetch);
     const firstSignal = fetchMock.mock.calls[0]?.[1]?.signal;
@@ -674,7 +674,7 @@ it("새 생성 전 이전 플레이어 종료가 실패하면 새 요청을 막�
     const abortRequest = vi.spyOn(AbortController.prototype, "abort");
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "이전 플레이어가 남은 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "이전 플레이어가 남은 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -707,7 +707,7 @@ it("언마운트 시 요청과 플레이어 및 Blob URL을 정리한다", async
     const { unmount } = render(<StrictMode>
       <Home />
     </StrictMode>);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "정리할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "정리할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     const requestSignal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal;
     act(() => {
@@ -732,7 +732,7 @@ it("언마운트 후 늦게 끝난 요청은 오디오 결과를 만들지 않�
     vi.stubGlobal("fetch", vi.fn(() => delayedResponse));
     const user = userEvent.setup();
     const { unmount } = render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "늦게 끝날 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "늦게 끝날 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     const requestSignal = vi.mocked(fetch).mock.calls[0]?.[1]?.signal;
@@ -757,7 +757,7 @@ it("영문 네트워크 오류를 친절한 한국어 안내로 정규화한다"
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "네트워크 오류를 확인할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "네트워크 오류를 확인할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => errorStream(new TypeError("Failed to fetch")));
     expect(await screen.findByRole("alert")).toHaveTextContent("음성 생성 중 연결이 끊어졌습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.");
@@ -766,7 +766,7 @@ it("영문 네트워크 오류를 친절한 한국어 안내로 정규화한다"
 it("생성 당시 음성과 시각을 다운로드 파일명에 고정한다", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "파일명을 확인할 음성");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "파일명을 확인할 음성");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
@@ -786,7 +786,7 @@ it("스트림 reader를 정상 완료 후 해제하고 오류 시 취소한다",
     vi.spyOn(console, "error").mockImplementation(() => { });
     const user = userEvent.setup();
     render(<Home />);
-    await user.type(screen.getByLabelText("음성으로 변환할 텍스트 입력창"), "reader 정리 성공");
+    await user.type(screen.getByLabelText("음성으로 변환할 대본 입력창"), "reader 정리 성공");
     await user.click(screen.getByRole("button", { name: "음성 생성하기 버튼" }));
     act(() => {
         streamController.enqueue(Uint8Array.from([0, 0]));
