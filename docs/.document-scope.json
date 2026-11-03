@@ -1,47 +1,47 @@
 {
   "schema": 1,
   "project": "/Users/vini/Documents/GitHub/gemini-tts",
-  "reviewed_at": "2026-10-14",
+  "reviewed_at": "2026-11-03",
   "files": {
     "superpowers/plans/2026-07-30-gemini-rate-limit-recovery.md": {
       "category": "project_document",
-      "sha256": "29b4c33649e44ae03def735c178ef0c9cf333d7be5ada5bf4605d37a4e06e0b0"
+      "sha256": "efb20b8c1f06f60acccba95bdbb5a408afaf5496b1aaa1769e63aabc60ccd23c"
     },
     "superpowers/plans/2026-07-30-long-form-tts-quality.md": {
       "category": "project_document",
-      "sha256": "dc235fe7ce686f821ed289bd1ce41d4cb3f85b33867ef9da4baefcc8ab88097f"
+      "sha256": "3b5c5d34f7ab7178b66baeab1289ca918345a7c22d96d0c7e556941ae464a2be"
     },
     "superpowers/plans/2026-07-30-single-request-tts.md": {
       "category": "project_document",
-      "sha256": "e7f6744b32c15f7192c8f074318c32046537a62a839fa4bf6556e331792a7c30"
+      "sha256": "b04a32fda811dc1ff0a7d1536a68a7ce053e75fb15427413c1fc98631ae86389"
     },
     "superpowers/plans/2026-07-30-streaming-tts-playback.md": {
       "category": "project_document",
-      "sha256": "da681ca13491c65da37ded5c26e2e62197110c5433baca77b033b2149f4e2674"
+      "sha256": "5fabf44da425ba5f8cad84b9ab613388f7e8d941e35b7132c13fb1e07b89c0b8"
     },
     "superpowers/plans/2026-09-02-health-route.md": {
       "category": "project_document",
-      "sha256": "bdfad66687650e83681b3c44dd5f510c5ee23415e768973b77e9c927362b79ea"
+      "sha256": "effa911ec86e91277b2fb98243d09a8a8034a6d5f0ca437dccc2d776786ce92a"
     },
     "superpowers/specs/2026-07-30-gemini-rate-limit-recovery-design.md": {
       "category": "project_document",
-      "sha256": "7f2dd6dec5a59783d949e1adff47eaca4d0fdd0f8d406244716b3573c5d6f301"
+      "sha256": "3f231c73af64a2ba209996490c4a859a117b8decf93595f0fca8fc6e51249575"
     },
     "superpowers/specs/2026-07-30-long-form-tts-quality-design.md": {
       "category": "project_document",
-      "sha256": "ad4f0bcfe3e664e6cb273fd59de4b0e6ec2b9cc868c6c26dbb2e5653834eebc5"
+      "sha256": "a980afb14c04a099777daad5d0226c42851bd5a9a126c30c02858ac0f17f30c5"
     },
     "superpowers/specs/2026-07-30-single-request-tts-design.md": {
       "category": "project_document",
-      "sha256": "ba3c1e73651cdf93dfefa2ed39b0edffdd277c9967d5f788123a1c87842cac6d"
+      "sha256": "8212573b175c87fc99e1b34f8e4895466756f72c1891dcaed06999ed30d5d015"
     },
     "superpowers/specs/2026-07-30-streaming-tts-playback-design.md": {
       "category": "project_document",
-      "sha256": "00b18a01f98a60c320ec3a63c8707ddfdcaab660bd2a3ed85dff94e915d35a88"
+      "sha256": "0dd4ea64bba265209e2f95319553d5860a2dc30d36a42c8dfbd8cb3e9262047c"
     },
     "superpowers/specs/2026-09-02-health-route-design.md": {
       "category": "project_document",
-      "sha256": "8fe554cd3c67e735f7fa6ada867c8cb4afb495c729a019030db06d37679acbfb"
+      "sha256": "b97be80378bea3596da466eb1a430dc269d84fd9700d1623dc88b8defef4ade8"
     },
     "DOCS-INDEX.md": {
       "category": "scope_index",

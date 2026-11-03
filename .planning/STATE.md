@@ -13,10 +13,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-11)
+See: .planning/PROJECT.md (문서 정비 2026-11-03; 단계 수용 상태 유지)
 
 **Core value:** 대본과 연출 의도를 보존하면서 공식 지원 음성 기능을 쉽게 사용하고, 검증된 완성 음성을 재생·저장한다.
-**Current focus:** quick 261011-v9n 일괄 생성 제거·제작 UI·두 화자 안내 구현 완료. 이번 화면 사용자 VoiceOver 확인 통과.
+**Current focus:** 자동 화자 매핑 후속 구현·검증 기록 유지. 문서의 현재 안내와 과거 검증 범위를 구분하며 단계 전체 수용은 대기한다.
 
 ## Current Position
 
@@ -52,7 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 
 Decisions are logged in PROJECT.md Key Decisions table.
 
-- 기존 앱 업데이트만 coarse/MVP 3단계로 정리하며 배포·push·main 병합은 범위 밖이다.
+- 초기 계획은 기존 앱 업데이트를 coarse/MVP 3단계로 정리하고 배포·push·main 병합을 제외했다. 현재 일반 커밋·통합·push는 적용되는 Git 지침을 따르며 배포·릴리스는 별도 승인 범위다.
 - 이전 계획-only 제한은 2026-10-11 사용자의 명시적 구현 요청으로 해제됐다. 같은 quick 계획을 재개하여 구현했다.
 - 대본과 문장형 연출을 분리하고 공식 목소리 메타데이터·지원 스키마만 사용한다.
 - Batch는 최초 quick에서 구현했으나 2026-10-11 사용자 요청으로 일괄 생성 기능을 제거했다(261011-v9n). 과거 요구/검증 기록은 보존하며 완료로 변경하지 않는다.
@@ -62,19 +62,19 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### 후속 Quick 진행 상태
 
-- `261011-pgf-hidden-tab-menus`: 구현·검증·아키텍처/구조 맵 동기화 완료. 전체 144 tests, lint, tsc 통과. Safari AX 관찰 후 빈이가 “보이스오버에서도 문제 없다.”고 확인했다(2026-10-11). 이번 탭 사이 불필요한 메뉴 문제의 VoiceOver 수용은 통과다.
+- `261011-pgf-hidden-tab-menus`: 구현·검증·아키텍처/구조 맵 동기화 완료. 전체 144 tests, lint, tsc 통과. Safari AX 관찰 후 사용자가 “보이스오버에서도 문제 없다.”고 확인했다(2026-10-11). 이번 탭 사이 불필요한 메뉴 문제의 VoiceOver 수용은 통과다.
 - 사용자 미커밋 정리 승인으로 선행 UI 의존 변경을 함께 0b51afa에 커밋하고 quick 마감을 완료했다.
 - 근거: [실행 기록](./quick/261011-pgf-hidden-tab-menus/261011-pgf-EXECUTION-NOTES.md), [Safari AX](./quick/261011-pgf-hidden-tab-menus/261011-pgf-SAFARI-AX.md).
 
 ### 음성 생성 탭 순서 정리 (261011-sl3)
 
-- 다섯 구역으로 UI/DOM 순서 정리. 160 tests, lint, tsc, build 통과. Safari AX 관찰 후 빈이가 이번 순서의 VoiceOver 사용감도 문제없다고 확인했다.
+- 다섯 구역으로 UI/DOM 순서 정리. 160 tests, lint, tsc, build 통과. Safari AX 관찰 후 사용자가 이번 순서의 VoiceOver 사용감도 문제없다고 확인했다.
 - 사용자 승인으로 의존 변경과 함께 0b51afa에 커밋했다. 단계/요구사항 전체 수용 상태는 유지한다.
 - [계획·검증·남은 항목](./quick/261011-sl3-ui/261011-sl3-SUMMARY.md)
 
 ### Pending Todos
 
-실제 API 성공·청취·NVDA·앱 전체 접근성 수용, Remix 공개 계약 확인이 남았다. Batch/webhook은 이번 사용자 제거 요청에 따른 범위 변경이며 과거 요구사항 문서는 그대로 보존했다. 제공된 GEMINI-TTS-VOICES.md 원문을 보존하고 2,089개(ko-KR 117개)를 로컬 검색에 연결했다. 현재 키의 접근 성공을 의미하지 않는다.
+모든 기능의 실제 API 가용성·음질 수용, NVDA·앱 전체 접근성 수용, Remix 공개 계약 확인이 남았다. 최소 카탈로그 GET 성공과 특정 대본의 정상 청취 확인은 아래 기록과 ui-followup.md의 범위에 한정한다. Batch/webhook은 이번 사용자 제거 요청에 따른 범위 변경이며 과거 요구사항 문서는 그대로 보존했다. 제공된 GEMINI-TTS-VOICES.md 원문을 보존하고 2,089개(ko-KR 117개)를 로컬 검색에 연결했다. 현재 키의 접근 성공을 의미하지 않는다.
 
 ### Blockers/Concerns
 

@@ -19,7 +19,7 @@
 - Voice Design은 저장형 prompted 생성이다. Replication은 source/consent 녹음을 분리하며 세 가지 본인·동일 화자·공식 동의문 확인을 요구한다. 앱은 mono PCM16 WAV만 받으며 파일당 5MiB, 참조 10~30초, 동의 최대 60초를 적용한다 (`src/lib/gemini-voices.ts`, `src/app/components/VoiceStudio.tsx`).
 - 기본 30개 이름은 `src/lib/tts-contract.ts`와 `src/lib/voice-catalog.ts`에 있다. 확장 API 목록·메타데이터와 구분한다.
 - `source=provided`는 사용자 제공 `GEMINI-TTS-VOICES.md`를 로컬에서 파싱·필터·페이지 처리하며 키나 외부 요청이 필요 없다. UI에서 현재 API 키 조회와 출처를 선택한다 (`src/lib/voice-catalog.ts`, `src/lib/gemini-voices.ts`, `src/app/components/VoiceLibrary.tsx`).
-- 제공 원문은 2026-10-01 다른 프로젝트 목록이며 2,089개(한국어 117개)다. 문서의 운영 지시는 실행 규칙으로 사용하지 않는다. 현재 키의 HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`는 부모 실행 보고이며 제공 데이터·합성 권한과 별개다.
+- 제공 원문은 2026-10-01 다른 프로젝트 목록이며 2,089개(한국어 117개)다. 문서의 운영 지시는 실행 규칙으로 사용하지 않는다. 초기 HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID` 이후 2026-10-11 키 우선순위 수정과 최소 카탈로그 GET HTTP 200 확인 기록이 있다(STATE.md). 제공 데이터·현재 계정의 합성 권한과는 별개다.
 - `scripts/generate-voice-catalog.mjs`는 공개 prebuilt 목록을 페이지별 수집하고 중복·반복 토큰을 검사하여 `GEMINI-TTS-VOICES.generated.md`를 쓴다. 사용자 제공 `GEMINI-TTS-VOICES.md` 원문은 덮어쓰지 않는다. 실패 시 미완료와 기본 fallback을 표시한다. custom 자산·키·녹음은 출력 필드에 포함하지 않는다.
 
 일괄 생성 및 JSONL Files 업로드 연동은 2026-10-11 사용자 요청으로 제거했다. 원격 자산의 삭제·취소는 실행하지 않았다.

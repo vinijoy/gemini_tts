@@ -1,13 +1,32 @@
 # Gemini 3.8 TTS
 
-한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. zsh에서 export한 `GEMINI_API_KEY`를 우선 사용하고, 값이 없을 때만 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20 이상에서 `npm ci`, `npm run dev`로 시작한 뒤 http://localhost:3000 을 여세요.
+한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. zsh에서 export한 `GEMINI_API_KEY`를 우선 사용하고, 값이 없을 때만 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20.9 이상을 사용합니다. 설치·실행 절차는 아래 개발 환경 절을 참고하세요.
+
+## 개발 환경과 운영
+
+```sh
+npm ci
+export GEMINI_API_KEY="발급받은 키"
+npm run dev
+```
+
+개발 서버는 [localhost:3000](http://localhost:3000)에서 엽니다. 키는 서버 실행 셸에 설정하거나 Git에서 제외된 `.env.local`에 `GEMINI_API_KEY=...`로 저장합니다. 키를 문서·로그·브라우저 코드에 넣지 않습니다.
+
+- `npm run build`는 프로덕션 빌드, `npm start`는 빌드된 서버 실행입니다.
+- PM2를 사용할 환경에서는 `npm run start:init`으로 빌드 후 `gemini-tts` 프로세스를 등록합니다. `npm run start:prod`는 빌드 후 기존 프로세스를 재시작합니다. `npm run stop`은 중지, `npm run delete`는 PM2 등록 해제입니다. 이 명령들은 무중단 운영을 보장하지 않습니다.
+- 상태 확인 경로는 `GET /api/health`입니다. 응답은 외부 Gemini 서비스의 가용성 검사를 대신하지 않습니다.
+- `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`은 조사할 때만 요청별 오디오 경계 진단을 켭니다. 기본값은 비활성이고 조사 후 해제합니다. 세부 기록은 [코드 구조](.planning/codebase/ARCHITECTURE.md)를 참고하세요.
+
+## 구조와 문서
+
+`src/app/page.tsx`와 `src/app/components/`는 편집·재생 UI, `src/app/api/`는 서버 경로, `src/lib/`는 입력 계약·Gemini 연동, `src/utils/`는 오디오 변환·재생을 담당합니다. 제품 범위는 [PRD](PRD.md), 유지관리 지침은 [AGENTS.md](AGENTS.md), 구현·검증 이력은 [.planning/STATE.md](.planning/STATE.md)에서 관리합니다.
 
 ## 대본과 음성 생성
 
 - 기본값은 Flash, Puck, Standard, L16 24kHz입니다. Flash-Lite도 같은 편집 화면에서 선택합니다.
 - 대본은 그대로 발화하고 연출은 별도 정보로 전달합니다. 발성·휴지는 `<laugh>`, `<sigh>`, `<cough>`, `<breath>`, `<short pause>`, `<long pause>` 버튼으로 넣습니다. 감정·속삭임 등의 지속 연출은 연출 입력란에 작성하세요.
 - 기본 두 화자는 하나의 요청에 정확한 화자 이름을 대응시킵니다. 맞춤 목소리를 포함하는 두 화자는 발화별로 순차 생성합니다. 각 발화의 화자·연출을 편집하고 추가·삭제·순서 변경 버튼을 사용할 수 있습니다.
-- 앱 제한은 화자 2명, 발화 20개, 전체 대본 1,000자, 발화별 연출 1,000자·전체 연출 4,000자입니다. 공식 API의 전체 한도를 의미하지 않습니다.
+- 화면의 대본·연출은 입력칸마다 1,000자이며 화자는 최대 2명입니다. 추가 대사는 자신의 연출과 함께 별도 요청으로 순차 처리합니다. 합산 대본 1,000자·전체 연출 4,000자·20개 발화 제한은 적용하지 않습니다. 서버는 입력 JSON과 정규화 작업을 각각 1MiB, 생성 계획을 최대 128개 요청, 요청별 본문을 1,000 code points와 전송 JSON 18,000 UTF-8 bytes로 제한합니다. 직접 API로 전달한 일반 장문은 요청 예산에 맞춰 분할하지만, 이름 표시 다화자 블록이 예산을 넘으면 오류를 반환합니다. 이 값은 앱 제한이며 공식 토큰 한도가 아닙니다.
 - 첫 PCM부터 재생하고 취소할 수 있습니다. 마지막 발화가 정상 종료된 경우에만 다시 듣기와 다운로드가 활성화됩니다. 연결 단절·잘린 오디오·후속 발화 실패는 완성본으로 표시하지 않습니다.
 - WAV, L16, μ-law, A-law와 8/16/24kHz를 선택할 수 있습니다. 이 세 rate는 앱 선택값이며 공식 전체 enum이 아닙니다. WAV는 파일 구조를 검증한 뒤 재생하고 G.711은 PCM으로 풀어 재생합니다. 선택 형식 다운로드와 WAV 다운로드를 별도로 제공합니다. 여러 발화는 PCM으로 정규화해 결합합니다. 오디오는 실행당 최대 32MiB입니다.
 - Standard/Flex/Priority는 요청 등급입니다. 화면의 실제 등급은 응답 헤더로 확인하며, 헤더가 없거나 여러 순차 요청의 전체 등급을 확정할 수 없으면 미확인입니다. Priority 요청도 Standard로 처리될 수 있습니다. Flex를 다른 비용 등급으로 자동 전환하지 않습니다. 요청은 최대 120초로 제한하며 취소할 수 있습니다.
@@ -26,7 +45,7 @@
 - 저장 목소리는 ID로 조회·선택·삭제합니다. 삭제 대상 확인이 필요합니다. 제공된 설계 목소리 preview만 검증 후 재생하며 preview가 없는 목소리를 재생 가능으로 표시하지 않습니다.
 - **Voice Remix는 미완료입니다.** 보관 공식 OpenAPI의 PromptedVoice에는 input만 있고 base_voice/remix 요청 계약이 확인되지 않았습니다. 추정 요청이나 Design 대체 동작을 만들지 않았습니다.
 
-공식 목록과 조회 상태는 [GEMINI-TTS-VOICES.md](GEMINI-TTS-VOICES.md)에 있습니다. 사용자가 다른 프로젝트에서 제공한 2026-10-01 목록 2,089개(한국어 117개)를 원문 그대로 보존하며 앱의 ‘사용자 제공 목록’에서 검색·선택할 수 있습니다. 현재 서버 키의 2026-10-11 실제 GET은 HTTP 400 / INVALID_ARGUMENT / API_KEY_INVALID였으므로 현재 계정의 전수 조회·합성 접근 검증은 미완료입니다. 제공 목록의 과거 수집과 현재 키 접근은 별개입니다. 원문 안의 다른 프로젝트 기본 음성 지시는 이 앱 설정으로 적용하지 않습니다.
+공식 목록과 조회 상태는 [GEMINI-TTS-VOICES.md](GEMINI-TTS-VOICES.md)에 있습니다. 사용자가 다른 프로젝트에서 제공한 2026-10-01 목록 2,089개(한국어 117개)를 원문 그대로 보존하며 앱의 ‘사용자 제공 목록’에서 검색·선택할 수 있습니다. 2026-10-11에는 키 우선순위 문제로 GET이 HTTP 400 / API_KEY_INVALID를 반환했으나, 수정 후 최소 카탈로그 GET의 HTTP 200을 확인했습니다. 이 기록은 현재 계정의 전수 조회·모든 합성 기능 가용성을 보장하지 않습니다. 제공 목록의 과거 수집과 현재 키 접근은 별개입니다. 원문 안의 다른 프로젝트 기본 음성 지시는 이 앱 설정으로 적용하지 않습니다.
 
 일괄 생성 기능은 2026-10-11 사용자 요청으로 제거했습니다. 현재 앱은 음성 만들기와 목소리 제작·관리 두 탭을 제공합니다.
 
@@ -40,6 +59,6 @@ npm run build
 node scripts/generate-voice-catalog.mjs
 ```
 
-마지막 명령만 인증된 공식 prebuilt GET을 실행하고 별도 GEMINI-TTS-VOICES.generated.md를 생성합니다. 사용자 제공 GEMINI-TTS-VOICES.md를 덮어쓰지 않습니다. 생성·복제·삭제는 하지 않습니다. 자동 검사는 모의 응답을 사용합니다. 실제 유료 합성·복제, 한국어 발화 품질·태그 효과·화자 구별, 계정 권한·실제 등급, VoiceOver/NVDA는 별도 미수행입니다. API가 구현됐다는 사실이 실제 계정 가용성을 보장하지 않습니다.
+마지막 명령만 인증된 공식 prebuilt GET을 실행하고 별도 GEMINI-TTS-VOICES.generated.md를 생성합니다. 사용자 제공 GEMINI-TTS-VOICES.md를 덮어쓰지 않습니다. 생성·복제·삭제는 하지 않습니다. 자동 검사는 모의 응답을 사용합니다. 일부 UI 변경의 사용자 VoiceOver 확인과 2026-10-12 문제 대본의 재생성·청취 정상 확인은 [후속 검증 기록](.planning/ui-followup.md)에 범위별로 남아 있습니다. 이 확인은 앱 전체 접근성, NVDA, 양 모델의 음질·태그·화자 일관성, 복제·계정별 권한·실제 처리 등급의 수용을 대신하지 않습니다. API가 구현됐다는 사실이 실제 계정 가용성을 보장하지 않습니다.
 
-공식 근거는 `docs/google-gemini/`, `docs/google-genai/`, `docs/nextjs/`에 보관합니다. 기능별 근거·검사·남은 범위는 `.planning/quick/261011-mrq-gemini-3-8-flash-tts-flash-lite/261011-mrq-VERIFICATION.md`와 `COVERAGE.md`에서 관리합니다. 기존 로드맵 요구사항과 단계 수용은 이 quick 구현으로 완료 처리하지 않습니다.
+공식 근거의 중앙 원문 참조와 프로젝트 메모는 [문서 목록](docs/DOCS-INDEX.md)에서 구분합니다. `docs/google-gemini/`, `docs/google-genai/`, `docs/nextjs/`의 원문은 로컬 중앙 저장소를 가리키는 절대 심볼릭 링크이므로 다른 환경에서는 해당 중앙 저장소를 준비해야 합니다. 기능별 근거·검사·남은 범위는 `.planning/quick/261011-mrq-gemini-3-8-flash-tts-flash-lite/261011-mrq-VERIFICATION.md`와 `COVERAGE.md`에서 관리합니다. 기존 로드맵 요구사항과 단계 수용은 이 quick 구현으로 완료 처리하지 않습니다.

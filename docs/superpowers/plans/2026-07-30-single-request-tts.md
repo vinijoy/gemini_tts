@@ -1,5 +1,7 @@
 # Single-request TTS Implementation Plan
 
+> 이 문서는 작성 당시의 계획·조사 기록이다. 현재 제품 범위는 [PRD](../../../PRD.md)를 따르며, 아래 계획이나 검증 상태를 현재 구현·실기 수용 완료로 해석하지 않는다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** TTS를 단일 생성 요청으로 되돌리고 본문 입력을 1,000자로 제한한다.

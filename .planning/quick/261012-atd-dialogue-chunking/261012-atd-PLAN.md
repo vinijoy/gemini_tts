@@ -176,7 +176,7 @@ page.test.tsx의 기존 “본문 입력과 태그 추가를 1,000자에서 원�
   </action>
   <verify>
     <automated>npm test -- src/app/page.test.tsx src/app/api/tts/route.test.ts src/app/generation-order.test.tsx</automated>
-    <human-check>빈이가 실제 VoiceOver로 긴 본문·추가 대사 입력, 자동 분할 설명 탐색, 탭 왕복과 오류 후 수정 동작을 확인한다. 사용자 확인 전에는 수용 대기로 기록한다.</human-check>
+    <human-check>사용자가 실제 VoiceOver로 긴 본문·추가 대사 입력, 자동 분할 설명 탐색, 탭 왕복과 오류 후 수정 동작을 확인한다. 사용자 확인 전에는 수용 대기로 기록한다.</human-check>
   </verify>
   <done>첫 대사와 추가 대사 모두 긴 입력·태그가 잘리지 않고 분할 생성된다. 실제 자원 한도만 명시적으로 안내되며 화면부터 완성 WAV까지 mock 회귀와 기존 접근성 DOM 회귀가 통과한다.</done>
 </task>

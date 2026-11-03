@@ -1,5 +1,7 @@
 # Gemini Rate Limit Recovery Implementation Plan
 
+> 이 문서는 작성 당시의 계획·조사 기록이다. 현재 제품 범위는 [PRD](../../../PRD.md)를 따르며, 아래 계획이나 검증 상태를 현재 구현·실기 수용 완료로 해석하지 않는다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Gemini TTS의 모델별 분당 429 제한을 Google 권장 시간만큼 한 번 자동 대기·재시도한다.

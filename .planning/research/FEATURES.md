@@ -1,5 +1,7 @@
 # 기능 조사: Gemini 3.8 TTS Web UI
 
+> 이 문서는 작성 당시의 계획·조사 기록이다. 현재 제품 범위는 [PRD](../../PRD.md)를 따르며, 아래 계획이나 검증 상태를 현재 구현·실기 수용 완료로 해석하지 않는다.
+
 **조사일:** 2026-10-11  
 **범위:** 공식 Flash / Flash-Lite TTS 기능 대조. 아래 항목은 구현 완료가 아닌 후속 구현·검증 체크리스트다.  
 **신뢰도:** MEDIUM — `classify-confidence --provider websearch --verified` 결과. 공식 가이드·모델 카드·Voices reference·연결 OpenAPI를 교차 확인했다. research-plan은 jina를 선택했지만 도구가 없어 검색+공식 HTTPS로 대체하고 digest를 저장했다. 실제 인증 카탈로그/유료 생성/청취는 수행하지 않았다.

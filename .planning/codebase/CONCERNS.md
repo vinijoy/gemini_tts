@@ -104,7 +104,7 @@ mapped_paths:
 **제공 카탈로그와 현재 계정의 접근 권한:**
 - Risk: 사용자 제공 `GEMINI-TTS-VOICES.md`의 2026-10-01 목록과 현재 키의 API 접근·합성 권한은 별개다.
 - Files: `src/lib/voice-catalog.ts`, `src/lib/gemini-voices.ts`, `src/app/components/VoiceLibrary.tsx`
-- Current mitigation: `source=provided`는 로컬 읽기 전용 검색이며 UI가 출처를 구분한다. 부모 실행에서 현재 키 GET은 HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`로 보고되었다. 제공 목록을 서비스 성공 증거로 사용하지 않는다.
+- Current mitigation: `source=provided`는 로컬 읽기 전용 검색이며 UI가 출처를 구분한다. 초기 실행에서 GET HTTP 400 `INVALID_ARGUMENT`/`API_KEY_INVALID`가 보고되었고, 2026-10-11 키 우선순위 수정 후 최소 카탈로그 GET HTTP 200을 확인했다(STATE.md). 현재 계정 상태를 재확인한 것은 아니다. 제공 목록을 서비스 성공 증거로 사용하지 않는다.
 
 ## Missing Critical Features
 

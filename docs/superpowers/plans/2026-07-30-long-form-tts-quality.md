@@ -1,5 +1,7 @@
 # Long-form TTS Continuity and Playback Quality Implementation Plan
 
+> 이 문서는 작성 당시의 계획·조사 기록이다. 현재 제품 범위는 [PRD](../../../PRD.md)를 따르며, 아래 계획이나 검증 상태를 현재 구현·실기 수용 완료로 해석하지 않는다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 긴 원고를 문장 단위 Gemini 요청으로 끝까지 생성하고, 생성 중과 완료 후 재생에 동일한 Web Audio 경로를 사용한다.

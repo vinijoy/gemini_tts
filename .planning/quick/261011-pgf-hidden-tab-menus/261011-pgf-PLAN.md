@@ -133,7 +133,7 @@ Discovery level 0: React 문맥·조건부 렌더링과 기존 제어형 입력 
   </action>
   <verify>
     <automated>npm test -- src/app/page.test.tsx src/app/components/choices.test.tsx</automated>
-    <human-check>로컬 앱에서 Safari로 최초 음성 만들기 진입 → 제작·관리 → 일괄 작업 → 음성 만들기 왕복을 확인한다. 접근 가능한 macOS/Safari AX 도구가 있으면 탭 묶음에서 활성 패널까지 노출되는 AX 메뉴/팝업 요소를 전후 비교하고 실제 관찰만 기록한다. Safari AX 확인이 불가능하면 도구 제한을 남긴다. DOM 또는 AX 결과만으로 실제 VoiceOver 발화를 확인했다고 쓰지 않는다. 빈이의 실제 발화 확인 전까지 해당 수용은 열린 상태다.</human-check>
+    <human-check>로컬 앱에서 Safari로 최초 음성 만들기 진입 → 제작·관리 → 일괄 작업 → 음성 만들기 왕복을 확인한다. 접근 가능한 macOS/Safari AX 도구가 있으면 탭 묶음에서 활성 패널까지 노출되는 AX 메뉴/팝업 요소를 전후 비교하고 실제 관찰만 기록한다. Safari AX 확인이 불가능하면 도구 제한을 남긴다. DOM 또는 AX 결과만으로 실제 VoiceOver 발화를 확인했다고 쓰지 않는다. 사용자의 실제 발화 확인 전까지 해당 수용은 열린 상태다.</human-check>
   </verify>
   <done>모든 비활성 패널에 native select가 없고 활성 선택·파일·초안·일괄 상태·백그라운드 동작 보존 회귀가 통과한다. 직접 관찰한 Safari 결과와 미확인 발화 범위가 구분된다.</done>
 </task>
