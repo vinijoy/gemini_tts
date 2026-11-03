@@ -4,6 +4,11 @@
 
 이 목록은 2026-10-14 분류 시점의 안내입니다. 현재 참조의 정본은 `~/.codex/document-sources.json`, 로컬 문서 분류는 `.document-scope.json`입니다. 새 파일이나 변경된 로컬 문서는 `python3 ~/.codex/scripts/audit_document_scopes.py`로 재검토 필요 여부를 확인합니다.
 
+## 사용·개발 안내
+
+- [사용 안내](../README.md): 음성 생성, 목소리 선택·제작, 문제 해결
+- [개발·운영 안내](DEVELOPMENT.md): 설치·실행, 환경 변수, 구현 제한, 검증
+
 ## 중앙 공식 원문 참조
 
 - [google-gemini/batch-api-reference.md](google-gemini/batch-api-reference.md)
