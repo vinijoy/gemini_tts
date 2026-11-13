@@ -33,6 +33,8 @@ export async function upstream(path: string, init: RequestInit = {}): Promise<Re
         }
         else
             await response.body?.cancel();
+        if (status === 402)
+            throw new AppError(402, "Google AI 프로젝트의 결제가 필요한 상태입니다. 선불 크레딧 잔액과 결제 설정을 Google AI Studio에서 확인하세요.");
         if (status === 400)
             throw new AppError(400, "선택한 목소리 또는 생성 설정을 서비스에서 처리하지 못했습니다. 목소리·모델·출력 설정을 확인하세요.");
         throw new AppError(status === 429 ? 429 : status === 404 ? 404 : status === 401 || status === 403 ? 403 : 502, status === 429 ? "음성 서비스 요청 한도가 초과된 상태입니다. 잠시 후 다시 시도하세요." : status === 404 ? "요청한 목소리 또는 작업이 없거나 만료된 상태입니다." : status === 401 || status === 403 ? "이 기능에 대한 계정 권한이 없는 상태입니다. 키와 서비스 권한을 확인하세요." : "음성 서비스 응답에 문제가 있는 상태입니다. 잠시 후 다시 시도하세요.", retry);

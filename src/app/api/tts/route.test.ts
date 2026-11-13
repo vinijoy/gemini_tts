@@ -11,6 +11,21 @@ const input=()=>({...structuredClone(defaultRequest),turns:[{speaker:"A",text:"�
 const event=(finish?:string,data="AAE=",mime="audio/l16;rate=24000")=>`data: ${JSON.stringify({candidates:[{content:{parts:[{inlineData:{data,mimeType:mime}}]},...(finish?{finishReason:finish}:{})}]})}\n\n`;
 const req=(body:unknown=input(),signal?:AbortSignal,origin="http://localhost")=>new Request("http://localhost/api/tts",{method:"POST",headers:{"Content-Type":"application/json",origin},body:JSON.stringify(body),signal});
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
+it("preserves payment-required errors without exposing provider details or retrying", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(
+        JSON.stringify({ error: { message: "Your prepayment credits are depleted. private detail" } }),
+        { status: 402 }
+    ));
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await POST(req());
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({
+        error: "Google AI 프로젝트의 결제가 필요한 상태입니다. 선불 크레딧 잔액과 결제 설정을 Google AI Studio에서 확인하세요."
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+});
 function threeTurns(){const r=input();return {...r,turns:[...r.turns,{speaker:"A",text:"둘",style:"뒤 연출"},{speaker:"A",text:"셋",style:"마지막"}]};}
 it("abort cancels a later pending SSE reader and prevents the third request",async()=>{
  const abort=new AbortController(),cancel=vi.fn();
