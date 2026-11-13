@@ -17,3 +17,30 @@ it("rejects invalid duration and malformed WAV before upload", async () => { con
 it("rejects stateless design", async () => await expect(createVoice({ store: false, voice: { model: "gemini-3.8-flash-tts", type: "prompted", prompted: { input: "voice" } } })).rejects.toThrow());
 it("validates preview RIFF and never leaks replication source or key on GET", async () => { vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "voice_1", type: "replicated", key: "private", replicated: { source_audio: audio(10) } })))); const v = await getVoice("voice_1"); expect(v.key).toBeUndefined(); expect(v).not.toHaveProperty("replicated"); });
 it("rejects resource traversal and cross-origin mutation", async () => { await expect(deleteVoice("../other")).rejects.toThrow(); const r = await POST(new Request("http://localhost/api/voices", { method: "POST", headers: { origin: "https://evil.invalid", "content-type": "application/json" }, body: "{}" })); expect(r.status).toBe(403); });
+
+it.each(["Puck", "catalog_123", "voice_custom"])("remixes %s through the real route without losing base_voice", async base => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "voice_remix", type: "prompted" })));
+    vi.stubGlobal("fetch", fetch);
+    const response = await POST(new Request("http://localhost/api/voices", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://localhost" },
+        body: JSON.stringify({ store: true, voice: { model: "gemini-3.8-flash-tts", type: "prompted", prompted: { base_voice: base, input: "조금 더 낮고 차분하게" } } })
+    }));
+    expect(response.status).toBe(200);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ store: true, voice: { model: "gemini-3.8-flash-tts", type: "prompted", prompted: { base_voice: base, input: "조금 더 낮고 차분하게" } } });
+    expect(await response.json()).toMatchObject({ id: "voice_remix" });
+});
+
+it.each(["", " ", "../voice", "voicekey_secret", null, 12, "x".repeat(257)])("rejects invalid remix base %s before upstream", async base => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await expect(createVoice({ store: true, voice: { model: "gemini-3.8-flash-tts", type: "prompted", prompted: { base_voice: base, input: "낮게" } } })).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+});
+
+it("rejects Flash-Lite remix creation before upstream", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await expect(createVoice({ store: true, voice: { model: "gemini-3.8-flash-lite-tts", type: "prompted", prompted: { base_voice: "Puck", input: "낮게" } } })).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+});

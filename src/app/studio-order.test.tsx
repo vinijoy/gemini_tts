@@ -87,3 +87,23 @@ it("조회한 목소리는 결과 구역에서 선택하고 관리 구역에서 
     expect(fetchMock).toHaveBeenLastCalledWith("/api/voices/voice_saved", expect.objectContaining({ method: "DELETE" }));
     expect(within(result).queryByRole("button", { name: "이 목소리를 화자 A에 선택" })).toBeNull();
 });
+
+it("리믹스 기준 선택은 탭을 떠나면 숨고 돌아오면 초안을 유지한다", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Home />);
+    await user.click(screen.getByRole("tab", { name: "목소리 제작·관리" }));
+    await user.selectOptions(screen.getByLabelText("제작 방식"), "remix");
+    await user.selectOptions(screen.getByLabelText("기준 목소리"), "Kore");
+    await user.type(screen.getByRole("textbox", { name: /변경 설명/ }), "더 차분하게");
+    expectOrder([
+        screen.getByLabelText("제작 방식"), screen.getByLabelText("제작 모델"),
+        screen.getByLabelText("목소리 이름"), screen.getByLabelText("기준 목소리"),
+        screen.getByRole("textbox", { name: /변경 설명/ }),
+        screen.getByRole("button", { name: "목소리 생성 (유료 요청)" })
+    ]);
+    await user.click(screen.getByRole("tab", { name: "음성 만들기" }));
+    expect(container.querySelector('[hidden] select')).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "목소리 제작·관리" }));
+    expect(screen.getByLabelText("기준 목소리")).toHaveValue("Kore");
+    expect(screen.getByRole("textbox", { name: /변경 설명/ })).toHaveValue("더 차분하게");
+});

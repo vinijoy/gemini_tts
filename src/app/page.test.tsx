@@ -226,7 +226,7 @@ it("키보드로 Design을 제출하고 실제 앱 API가 반환한 저장 음�
     await user.keyboard("{Enter}");
     await waitFor(() => expect(select).toHaveBeenCalledWith({ kind: "stored-custom", value: "voice_1" }));
     expect(screen.getByRole("button", { name: "확인한 목소리 삭제" })).toBeDisabled();
-    expect(screen.getByText(/기존 목소리 변형 기능은/)).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /기존 목소리 리믹스/ })).toBeInTheDocument();
 });
 it("화면 제출부터 실제 POST와 REST 응답을 거쳐 완료 WAV까지 연결한다", async () => {
     streamSettled = true;

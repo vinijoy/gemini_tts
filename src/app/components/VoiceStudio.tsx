@@ -3,7 +3,7 @@ import { TabSelect } from "./TabPanel";
 import LocaleSelect from "./LocaleSelect";
 import { MODEL_LABELS, GENDERS, VOICE_TYPES } from "@/lib/tts-labels";
 import { useRef, useState } from "react";
-import { MODELS, type VoiceRef } from "@/lib/tts-contract";
+import { MODELS, VOICE_NAMES, resourceId, string, type VoiceRef } from "@/lib/tts-contract";
 import { voiceRef, type CatalogVoice } from "@/lib/voice-catalog";
 import { base64Bytes, bytesBase64, parseWav } from "@/utils/audio-format";
 import { api, VoicePreview, Announce } from "./VoiceLibrary";
@@ -12,6 +12,9 @@ export default function VoiceStudio({ onSelect }: {
     onSelect: (voice: VoiceRef) => void;
 }) {
     const [mode, setMode] = useState("prompted"), [name, setName] = useState(""), [description, setDescription] = useState(""), [model, setModel] = useState<string>(MODELS[0]), [language, setLanguage] = useState(""), [gender, setGender] = useState(""), [store, setStore] = useState(true), [checks, setChecks] = useState([false, false, false]), [source, setSource] = useState<File | null>(null), [consent, setConsent] = useState<File | null>(null), [voice, setVoice] = useState<CatalogVoice | null>(null), [id, setId] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [confirmDelete, setConfirmDelete] = useState(false);
+    const [baseVoice, setBaseVoice] = useState("Puck");
+    const [baseId, setBaseId] = useState("");
+    const [remixDescription, setRemixDescription] = useState("");
     const actionRef = useRef<HTMLButtonElement>(null);
     async function act(action: () => Promise<void>) { if (busy)
         return; setBusy(true); setMessage(""); try {
@@ -28,11 +31,17 @@ export default function VoiceStudio({ onSelect }: {
     async function fileData(file: File | null, isSource: boolean) { if (!file || file.size > 5 * 1024 * 1024)
         throw new Error("녹음 파일이 없거나 앱의 5MiB 제한을 넘은 상태입니다."); const bytes = new Uint8Array(await file.arrayBuffer()); const wav = parseWav(bytes); if (isSource && (wav.duration < 10 || wav.duration > 30) || !isSource && wav.duration > 60)
         throw new Error("녹음 길이가 참조 10~30초·동의 최대 60초인 앱 제한을 벗어난 상태입니다."); return { mime_type: "audio/wav", data: bytesBase64(bytes) }; }
-    async function create() { const v: Record<string, unknown> = { model, type: mode, ...(name ? { display_name: name } : {}), ...(language ? { language_code: [language] } : {}), ...(gender ? { gender } : {}) }; if (mode === "prompted")
+    async function create() { const v: Record<string, unknown> = { model: mode === "remix" ? MODELS[0] : model, type: mode === "remix" ? "prompted" : mode, ...(name ? { display_name: name } : {}), ...(language ? { language_code: [language] } : {}), ...(gender ? { gender } : {}) }; if (mode === "prompted")
         v.prompted = { input: description };
-    else {
+    else if (mode === "remix") {
+        const base = resourceId(baseVoice === "custom" ? baseId : baseVoice);
+        if (base.startsWith("voicekey_")) {
+            throw new Error("비저장 목소리는 리믹스 기준으로 사용할 수 없는 상태입니다.");
+        }
+        v.prompted = { base_voice: base, input: string(remixDescription, 2000, "변경 설명") };
+    } else {
         v.replicated = { source_audio: await fileData(source, true), consent_audio: await fileData(consent, false) };
-    } const result = await api<CatalogVoice>("/api/voices", { method: "POST", body: JSON.stringify({ store: mode === "prompted" ? true : store, voice: v, confirmedAdultOwner: checks[0], confirmedSameSpeaker: checks[1], confirmedConsentPhrase: checks[2] }) }); if (result.preview)
+    } const result = await api<CatalogVoice>("/api/voices", { method: "POST", body: JSON.stringify({ store: mode === "replicated" ? store : true, voice: v, confirmedAdultOwner: checks[0], confirmedSameSpeaker: checks[1], confirmedConsentPhrase: checks[2] }) }); if (result.preview)
         parseWav(base64Bytes(result.preview.data)); setVoice(result); setId(result.id); setSource(null); setConsent(null); setChecks([false, false, false]); onSelect(voiceRef(result)); setMessage("목소리를 생성하여 화자 A에 선택한 상태입니다."); }
     return <section aria-label="목소리 제작과 관리" className="space-y-6">
         <p className="text-sm text-gray-600">제작 방식과 목소리 특징을 정한 뒤 목소리를 생성하세요. 완성된 목소리는 음성 만들기 탭의 첫 번째 화자에 적용됩니다.</p>
@@ -43,10 +52,11 @@ export default function VoiceStudio({ onSelect }: {
                 <legend>제작 설정</legend>
                 <label>제작 방식<TabSelect aria-describedby="studio-mode-help" value={mode} onChange={e => setMode(e.target.value)}>
                     <option value="prompted">설명으로 만들기 — 원하는 목소리를 글로 설명</option>
+                    <option value="remix">기존 목소리 리믹스 — 기준 목소리의 특징 변경</option>
                     <option value="replicated">녹음으로 복제하기 — 본인의 목소리 녹음 사용</option>
                 </TabSelect></label>
-                <p id="studio-mode-help">새로운 목소리를 설계하려면 설명으로 만들기, 본인의 목소리를 재현하려면 녹음으로 복제하기를 선택하세요.</p>
-                <label>제작 모델<TabSelect value={model} onChange={e => setModel(e.target.value)}>{MODELS.map(m => <option key={m} value={m}>{MODEL_LABELS[m]}</option>)}</TabSelect></label>
+                <p id="studio-mode-help">새로운 목소리를 설계하려면 설명으로 만들기, 기존 목소리의 특징을 바꾸려면 리믹스, 본인의 목소리를 재현하려면 녹음으로 복제하기를 선택하세요.</p>
+                {mode === "remix" ? <label>제작 모델<input readOnly value={MODEL_LABELS[MODELS[0]]}/></label> : <label>제작 모델<TabSelect value={model} onChange={e => setModel(e.target.value)}>{MODELS.map(m => <option key={m} value={m}>{MODEL_LABELS[m]}</option>)}</TabSelect></label>}
             </fieldset>
         </section>
 
@@ -62,10 +72,18 @@ export default function VoiceStudio({ onSelect }: {
         </section>
 
         <section aria-labelledby="studio-material" className="space-y-4">
-            <h2 id="studio-material" className="text-lg font-bold text-purple-900">{mode === "prompted" ? "3. 목소리 설명" : "3. 녹음과 동의"}</h2>
+            <h2 id="studio-material" className="text-lg font-bold text-purple-900">{mode === "remix" ? "3. 기준 목소리와 변경 설명" : mode === "prompted" ? "3. 목소리 설명" : "3. 녹음과 동의"}</h2>
             <fieldset disabled={busy} className="space-y-3 border rounded-xl p-4">
-                <legend>{mode === "prompted" ? "원하는 목소리" : "참조 녹음과 본인 동의"}</legend>
-                {mode === "prompted" ? <>
+                <legend>{mode === "remix" ? "리믹스 설정" : mode === "prompted" ? "원하는 목소리" : "참조 녹음과 본인 동의"}</legend>
+                {mode === "remix" ? <>
+                    <label>기준 목소리<TabSelect value={baseVoice} onChange={e => setBaseVoice(e.target.value)}>
+                        {VOICE_NAMES.map(value => <option key={value} value={value}>{value}</option>)}
+                        <option value="custom">확장·저장 목소리 ID 직접 입력</option>
+                    </TabSelect></label>
+                    {baseVoice === "custom" && <label>기준 목소리 ID<input aria-describedby="studio-remix-help" value={baseId} maxLength={256} onChange={e => setBaseId(e.target.value)}/></label>}
+                    <label>변경 설명 (앱 제한 2,000자)<input aria-describedby="studio-remix-help" value={remixDescription} maxLength={2000} onChange={e => setRemixDescription(e.target.value)}/></label>
+                    <p id="studio-remix-help">기준 목소리에서 바꿀 높낮이·말투·분위기를 설명하세요. 확장 목소리나 저장한 목소리는 접근 가능한 ID를 사용하세요. 원본은 유지되고 새로운 목소리가 저장됩니다.</p>
+                </> : mode === "prompted" ? <>
                     <label>설계 설명 (1~2문장, 앱 제한 2,000자)<textarea aria-describedby="studio-description-help" value={description} maxLength={2000} onChange={e => setDescription(e.target.value)}/></label>
                     <p id="studio-description-help">원하는 목소리의 높낮이·말투·분위기를 설명하세요.</p>
                 </> : <>
@@ -110,7 +128,6 @@ export default function VoiceStudio({ onSelect }: {
                     <button type="button" disabled={!confirmDelete || id !== voice.id} onClick={() => void act(async () => { await api(`/api/voices/${encodeURIComponent(voice.id)}`, { method: "DELETE" }); setVoice(null); setConfirmDelete(false); setMessage("저장 목소리를 삭제했습니다."); })}>확인한 목소리 삭제</button>
                 </>}
             </fieldset>
-            <p className="text-sm text-gray-600">기존 목소리 변형 기능은 현재 사용할 수 없는 상태입니다.</p>
         </section>
     </section>;
 }

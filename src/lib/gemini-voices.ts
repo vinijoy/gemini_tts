@@ -68,7 +68,17 @@ export async function createVoice(value: unknown) { const b = object(value), v =
 } if (v.type === "prompted") {
     if (!b.store)
         throw new AppError(400, "설계 목소리는 저장형만 지원하는 상태입니다.");
-    voice.prompted = { input: string(object(v.prompted).input, 2000, "설계 설명") };
+    const prompted = object(v.prompted);
+    const input = string(prompted.input, 2000, "목소리 설명");
+    if (prompted.base_voice !== undefined) {
+        const base = resourceId(prompted.base_voice);
+        if (base.startsWith("voicekey_") || v.model !== "gemini-3.8-flash-tts") {
+            throw new AppError(400, "리믹스 기준 목소리 또는 제작 모델이 올바르지 않습니다.");
+        }
+        voice.prompted = { input, base_voice: base };
+    } else {
+        voice.prompted = { input };
+    }
 }
 else {
     if (b.confirmedAdultOwner !== true || b.confirmedSameSpeaker !== true || b.confirmedConsentPhrase !== true)
