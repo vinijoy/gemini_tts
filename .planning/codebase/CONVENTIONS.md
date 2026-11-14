@@ -25,7 +25,7 @@
 2. `@/*` 별칭 import
 3. 상대 경로 import
 
-`@/*`는 `src/*`에 매핑된다 (`tsconfig.json`, `vitest.config.ts`). 같은 모듈 테스트는 상대 경로를 사용한다 (`src/app/api/tts/route.test.ts`).
+`@/*`는 `src/*`에 매핑된다 (`tsconfig.json`, `vitest.config.mts`). 같은 모듈 테스트는 상대 경로를 사용한다 (`src/app/api/tts/route.test.ts`).
 
 ## 오류 처리
 

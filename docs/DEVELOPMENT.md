@@ -1,6 +1,6 @@
 # Gemini 3.8 TTS 개발·운영 안내
 
-한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. zsh에서 export한 `GEMINI_API_KEY`를 우선 사용하고, 값이 없을 때만 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. Node.js 20.9 이상을 사용합니다. 설치·실행 절차는 아래 개발 환경 절을 참고하세요.
+한국어 대본과 연출을 따로 입력하고 Gemini 3.8 Flash TTS 또는 Flash-Lite TTS로 음성을 만드는 로컬 웹 앱입니다. zsh에서 export한 `GEMINI_API_KEY`를 우선 사용하고, 값이 없을 때만 `.env.local`을 사용하며 키를 브라우저에 전달하지 않습니다. 개발·빌드·테스트에는 Node.js 20.19 이상(20.x) 또는 22.12 이상을 사용합니다. 설치·실행 절차는 아래 개발 환경 절을 참고하세요.
 
 화면 사용 순서는 [사용 안내](../README.md)를 참고하세요.
 
@@ -15,7 +15,8 @@ npm run dev
 개발 서버는 [localhost:3000](http://localhost:3000)에서 엽니다. 키는 서버 실행 셸에 설정하거나 Git에서 제외된 `.env.local`에 `GEMINI_API_KEY=...`로 저장합니다. 키를 문서·로그·브라우저 코드에 넣지 않습니다.
 
 - `npm run build`는 프로덕션 빌드, `npm start`는 빌드된 서버 실행입니다.
-- PM2를 사용할 환경에서는 `npm run start:init`으로 빌드 후 `gemini-tts` 프로세스를 등록합니다. `npm run start:prod`는 빌드 후 기존 프로세스를 재시작합니다. `npm run stop`은 중지, `npm run delete`는 PM2 등록 해제입니다. 이 명령들은 무중단 운영을 보장하지 않습니다.
+- `npm run start:prod`는 빌드가 성공하면 PM2에 `gemini-tts`를 등록하거나 기존 프로세스를 재시작합니다. `npm run start:init`도 같은 명령을 실행하므로 최초 실행을 구분할 필요가 없습니다. PM2는 개발 의존성에 버전을 고정하며 `npm install`로 함께 설치됩니다.
+- PM2는 `ecosystem.config.cjs`의 프로젝트 경로에서 Next.js를 직접 실행하고 재시작할 때 실행 셸의 환경 변수를 갱신합니다. `.env.local`은 Next.js가 시작할 때 읽습니다. `npm run stop`은 중지, `npm run delete`는 PM2 등록 해제입니다. 이 명령들은 무중단 운영을 보장하지 않습니다.
 - 상태 확인 경로는 `GET /api/health`입니다. 응답은 외부 Gemini 서비스의 가용성 검사를 대신하지 않습니다.
 - `GEMINI_TTS_AUDIO_DIAGNOSTICS=1`은 조사할 때만 요청별 오디오 경계 진단을 켭니다. 기본값은 비활성이고 조사 후 해제합니다. 세부 기록은 [코드 구조](../.planning/codebase/ARCHITECTURE.md)를 참고하세요.
 

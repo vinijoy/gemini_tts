@@ -7,17 +7,17 @@
     "dev:watch": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:prod": "npm run build && npx pm2 restart gemini-tts",
-    "start:init": "npm run build && npx pm2 start npm --name \"gemini-tts\" -- start",
-    "stop": "npx pm2 stop gemini-tts",
-    "delete": "npx pm2 delete gemini-tts",
+    "start:prod": "npm run build && pm2 startOrRestart ecosystem.config.cjs --update-env",
+    "start:init": "npm run start:prod",
+    "stop": "pm2 stop gemini-tts",
+    "delete": "pm2 delete gemini-tts",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@google/genai": "2.28.0",
-    "next": "^16.2.12",
+    "next": "^16.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -30,18 +30,19 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.39.5",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.4.6",
     "jsdom": "^27.2.0",
+    "pm2": "7.1.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "@eslint/config-array": "0.23.5",
     "@eslint/eslintrc": "3.3.6",
-    "brace-expansion": "5.0.8",
-    "minimatch": "10.2.6",
+    "brace-expansion": "5.0.13",
+    "minimatch": "11.0.8",
     "postcss": "8.5.25",
-    "sharp": "0.35.3"
+    "sharp": "0.35.5"
   }
 }

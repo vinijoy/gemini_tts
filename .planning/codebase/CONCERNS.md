@@ -128,7 +128,7 @@ mapped_paths:
 
 **실제 런타임 경계 검증:**
 - What's not tested: 실계정 유료 합성·설계·복제·Batch, 외부 네트워크 timeout, 실제 브라우저 스트림 중단·AudioContext·VoiceOver/NVDA 상호작용.
-- Files: `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `src/app/page.tsx`, `vitest.config.ts`
+- Files: `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/lib/gemini-batches.ts`, `src/app/page.tsx`, `vitest.config.mts`
 - Risk: 모킹된 Gemini와 jsdom이 배포 런타임 차이를 놓칠 수 있다.
 - Priority: Medium
 

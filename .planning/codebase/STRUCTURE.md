@@ -19,7 +19,7 @@ gemini_tts/
 ├── public/                  # 정적 자산
 ├── docs/                    # Next.js 문서·설계·Graphify 산출물
 ├── next.config.ts           # Next 설정
-├── vitest.config.ts         # 테스트 설정
+├── vitest.config.mts         # 테스트 설정
 ├── package.json             # 명령·의존성
 └── PRD.md                   # 제품 요구사항
 ```
@@ -60,7 +60,7 @@ gemini_tts/
 
 **진입점:** `src/app/page.tsx` (`/`), `src/app/api/tts/route.ts` (`POST /api/tts`), `src/app/api/health/route.ts` (`GET /api/health`), `src/app/layout.tsx` (전역 레이아웃).
 
-**설정:** `package.json`, `next.config.ts`, `tsconfig.json`, `vitest.config.ts`, `eslint.config.mjs`.
+**설정:** `package.json`, `next.config.ts`, `tsconfig.json`, `vitest.config.mts`, `eslint.config.mjs`.
 
 **핵심 로직:** `src/lib/tts-contract.ts`, `src/lib/gemini-client.ts`, `src/lib/gemini-tts.ts`, `src/lib/gemini-voices.ts`, `src/utils/audio-format.ts`, `src/utils/pcm-audio.ts`, `src/utils/streaming-player.ts`.
 

@@ -26,7 +26,7 @@ mapped_paths:
 
 ## 테스트 프레임워크
 
-**실행기:** Vitest `^4.1.10`, 설정 `vitest.config.ts`. 현재 통과 수는 실행 시점의 검증 기록을 사용하며 이 부분 갱신에서는 테스트를 재실행하지 않았다. `package.json`의 실행 명령은 `vitest run`으로 `passWithNoTests`가 없다.
+**실행기:** Vitest `^4.1.12`, 설정 `vitest.config.mts`. 현재 통과 수는 실행 시점의 검증 기록을 사용하며 이 부분 갱신에서는 테스트를 재실행하지 않았다. `package.json`의 실행 명령은 `vitest run`으로 `passWithNoTests`가 없다.
 
 **Assertion library:** Vitest `expect`와 `@testing-library/jest-dom/vitest`를 사용한다.
 
@@ -40,7 +40,7 @@ npm run lint
 
 ## 테스트 파일 구성
 
-구현과 같은 위치에 둔다. 현재 파일은 `src/app/api/health/route.test.ts`, `src/app/api/tts/route.test.ts`, `src/app/api/tts/stream.test.ts`, `src/app/page.test.tsx`, `src/app/vitest-environment.test.tsx`, `src/utils/pcm-audio.test.ts`, `src/utils/streaming-player.test.ts`다. API·유틸리티는 `node`, React 테스트는 `jsdom`을 사용하도록 `vitest.config.ts`의 projects에서 분리한다.
+구현과 같은 위치에 둔다. 현재 파일은 `src/app/api/health/route.test.ts`, `src/app/api/tts/route.test.ts`, `src/app/api/tts/stream.test.ts`, `src/app/page.test.tsx`, `src/app/vitest-environment.test.tsx`, `src/utils/pcm-audio.test.ts`, `src/utils/streaming-player.test.ts`다. API·유틸리티는 `node`, React 테스트는 `jsdom`을 사용하도록 `vitest.config.mts`의 projects에서 분리한다.
 
 ## 테스트 구조
 
